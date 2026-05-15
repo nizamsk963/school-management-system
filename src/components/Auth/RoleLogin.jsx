@@ -1,13 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-function Login() {
+function RoleLogin({ title, role, redirectPath }) {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
     username: "",
     password: "",
-    role: "teacher",
   });
 
   const handleChange = (e) => {
@@ -20,39 +19,30 @@ function Login() {
   const handleLogin = (e) => {
     e.preventDefault();
 
-    const { username, password, role } = formData;
-
     // Validation
-    if (!username || !password) {
+    if (!formData.username || !formData.password) {
       alert("Please enter username and password");
       return;
     }
 
-    // Save login data in localStorage
+    // Save login information
     localStorage.setItem("isLoggedIn", "true");
-    localStorage.setItem("username", username);
     localStorage.setItem("role", role);
+    localStorage.setItem("username", formData.username);
 
-    // Redirect based on selected role
-    const roleRoutes = {
-      teacher: "/teacher",
-      student: "/student",
-      parent: "/parent",
-      principal: "/principal",
-    };
-
-    navigate(roleRoutes[role] || "/");
+    // Redirect to dashboard
+    navigate(redirectPath);
   };
 
   return (
     <div style={styles.container}>
       <form onSubmit={handleLogin} style={styles.card}>
-        <h1 style={styles.title}>🏫 School Management Login</h1>
+        <h1>{title}</h1>
 
         <input
           type="text"
           name="username"
-          placeholder="Enter Username"
+          placeholder="Username"
           value={formData.username}
           onChange={handleChange}
           style={styles.input}
@@ -61,23 +51,11 @@ function Login() {
         <input
           type="password"
           name="password"
-          placeholder="Enter Password"
+          placeholder="Password"
           value={formData.password}
           onChange={handleChange}
           style={styles.input}
         />
-
-        <select
-          name="role"
-          value={formData.role}
-          onChange={handleChange}
-          style={styles.input}
-        >
-          <option value="teacher">Teacher</option>
-          <option value="student">Student</option>
-          <option value="parent">Parent</option>
-          <option value="principal">Principal</option>
-        </select>
 
         <button type="submit" style={styles.button}>
           Login
@@ -94,11 +72,9 @@ const styles = {
     justifyContent: "center",
     alignItems: "center",
     background: "#f3f4f6",
-    padding: "20px",
   },
   card: {
-    width: "100%",
-    maxWidth: "420px",
+    width: "400px",
     background: "#ffffff",
     padding: "40px",
     borderRadius: "16px",
@@ -107,17 +83,11 @@ const styles = {
     flexDirection: "column",
     gap: "15px",
   },
-  title: {
-    textAlign: "center",
-    marginBottom: "10px",
-    color: "#111827",
-  },
   input: {
     padding: "12px",
     borderRadius: "8px",
     border: "1px solid #d1d5db",
     fontSize: "16px",
-    outline: "none",
   },
   button: {
     padding: "12px",
@@ -126,9 +96,8 @@ const styles = {
     background: "#2563eb",
     color: "#ffffff",
     fontSize: "16px",
-    fontWeight: "600",
     cursor: "pointer",
   },
 };
 
-export default Login;
+export default RoleLogin;
