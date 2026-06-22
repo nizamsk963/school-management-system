@@ -1,0 +1,2354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>School Management System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-feature-settings: "cv08" 1; }
+    .sidebar-scroll { max-height: calc(100vh - 5.5rem); overflow-y: auto; }
+    .notification-panel { max-height: calc(100vh - 5.5rem); overflow-y: auto; }
+    .notification-item { animation: fadeIn 0.2s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .drop-area { border-style: dashed; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="flex flex-col min-h-screen">
+    <header class="flex items-center justify-between gap-4 px-6 py-4 bg-white border-b border-slate-200 sticky top-0 z-40">
+      <div>
+        <div class="text-xl font-semibold text-slate-900">School Management Engine</div>
+        <div class="text-sm text-slate-500">Functional Role SPA with dynamic workspace rendering</div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <label class="text-sm text-slate-600">Switch Role:</label>
+        <select id="roleSwitcher" class="px-3 py-2 rounded-lg border border-slate-300 bg-white text-slate-800 shadow-sm"></select>
+        <div class="relative">
+          <button id="notificationToggle" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition">
+            <span>Notifications</span>
+            <span id="notificationBadge" class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-rose-500 text-xs font-semibold">0</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+      <aside class="w-72 border-r border-slate-200 bg-slate-950 text-slate-100 sidebar-scroll px-4 py-5">
+        <div class="mb-6">
+          <div class="text-sm uppercase tracking-[0.2em] text-slate-400">Role Menu</div>
+          <div id="currentRoleLabel" class="mt-3 text-xl font-semibold"></div>
+        </div>
+        <div id="sidebarMenu" class="space-y-3"></div>
+      </aside>
+
+      <main id="workspace" class="flex-1 overflow-y-auto p-6"></main>
+
+      <aside class="w-96 border-l border-slate-200 bg-slate-50 px-5 py-5 notification-panel">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Real-Time Notification Panel</div>
+            <div class="mt-1 text-xs text-slate-400">Live updates stream for all role actions.</div>
+          </div>
+          <button id="clearNotifications" class="text-sm text-slate-700 hover:text-slate-900">Clear</button>
+        </div>
+        <div id="notificationList" class="space-y-3"></div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    const state = {
+      currentRole: 'Super Admin',
+      roles: [
+        'Super Admin', 'Principal', 'Vice Principal', 'Admin', 'Teacher', 'Student', 'Parent', 'Accountant'
+      ],
+      schools: [
+        { id: 'SCH100', name: 'Cedar Valley High School', location: 'Sector 22', board: 'CBSE', license: 'LIC-9842', status: 'Active', tier: 'Enterprise' },
+        { id: 'SCH101', name: 'Sunrise Academy', location: 'Downtown', board: 'ICSE', license: 'LIC-1033', status: 'Suspended', tier: 'Premium' }
+      ],
+      principals: [
+        { id: 'PRN01', name: 'Anita Desai', email: 'anita.desai@cedarvalley.edu', schoolId: 'SCH100' }
+      ],
+      admins: [
+        { id: 'ADM01', name: 'Rohan Mehta', email: 'rohan.mehta@cedarvalley.edu', department: 'Admissions' }
+      ],
+      students: [
+        { admissionNumber: 'STD001', name: 'Aarav Singh', grade: '5', section: 'A', parent: { name: 'Pooja Singh', contact: '9876543210' }, attendance: { present: 152, absent: 8, late: 2 }, marks: { Math: 88, Science: 92, English: 85 }, status: 'Active' },
+        { admissionNumber: 'STD002', name: 'Meera Sharma', grade: '6', section: 'B', parent: { name: 'Suresh Sharma', contact: '9876512340' }, attendance: { present: 148, absent: 12, late: 1 }, marks: { Math: 92, Science: 89, English: 90 }, status: 'Active' },
+        { admissionNumber: 'STD003', name: 'Riya Patel', grade: '4', section: 'C', parent: { name: 'Nilesh Patel', contact: '9876501234' }, attendance: { present: 160, absent: 4, late: 0 }, marks: { Math: 95, Science: 94, English: 91 }, status: 'Active' }
+      ],
+      teachers: [
+        { employeeId: 'TCH100', name: 'Priya Nair', subjects: ['Mathematics', 'Physics'], salary: 62000, leaveStatus: 'Pending', assignedClasses: ['5A', '6B'] },
+        { employeeId: 'TCH101', name: 'Rahul Kapur', subjects: ['English', 'History'], salary: 58000, leaveStatus: 'Approved', assignedClasses: ['4C'] },
+        { employeeId: 'TCH102', name: 'Sneha Rao', subjects: ['Biology', 'Chemistry'], salary: 65000, leaveStatus: 'None', assignedClasses: ['6B', '5A'] }
+      ],
+      financials: {
+        fees: [
+          { id: 'FEE001', student: 'Aarav Singh', grade: '5', type: 'Tuition', amount: 45000, dueDate: '2026-07-05', status: 'Pending' },
+          { id: 'FEE002', student: 'Meera Sharma', grade: '6', type: 'Transport', amount: 12000, dueDate: '2026-07-15', status: 'Paid' },
+          { id: 'FEE003', student: 'Riya Patel', grade: '4', type: 'Hostel', amount: 55000, dueDate: '2026-08-01', status: 'Pending' }
+        ],
+        expenses: [
+          { id: 'EXP100', category: 'Utilities', description: 'Electricity bill for June', amount: 22000, date: '2026-06-10' },
+          { id: 'EXP101', category: 'Maintenance', description: 'Lift servicing', amount: 12500, date: '2026-06-12' }
+        ]
+      },
+      notifications: [
+        { id: 1, message: '[Teacher uploaded homework] Homework posted for Grade 5.', channels: ['Student', 'Parent'], time: '09:02 AM' },
+        { id: 2, message: '[Fee payment successful] Aarav Singh fee cleared.', channels: ['Accountant', 'Parent'], time: '08:50 AM' },
+        { id: 3, message: '[Principal approved admission] New student batch admitted.', channels: ['Admin', 'Parent', 'Accountant'], time: '08:15 AM' }
+      ],
+      auditLogs: [
+        { id: 'AL001', action: 'Created new school profile', user: 'Super Admin', time: '07:45 AM', ip: '192.168.1.11' },
+        { id: 'AL002', action: 'Approved admission request', user: 'Principal', time: '08:15 AM', ip: '192.168.1.22' }
+      ],
+      pendingAdmissions: [
+        { admissionNumber: 'PEN100', name: 'Kabir Jain', grade: '5', section: 'A', parent: 'Rashmi Jain' },
+        { admissionNumber: 'PEN101', name: 'Neha Verma', grade: '6', section: 'B', parent: 'Kiran Verma' }
+      ],
+      leaveRequests: [
+        { id: 'LR100', teacher: 'Priya Nair', date: '2026-06-18', reason: 'Medical appointment', status: 'Pending' },
+        { id: 'LR101', teacher: 'Rahul Kapur', date: '2026-06-20', reason: 'Personal work', status: 'Pending' }
+      ],
+      assignments: [
+        { id: 'ASG100', title: 'Algebra practice', subject: 'Mathematics', deadline: '2026-06-28', createdBy: 'Priya Nair' }
+      ],
+      reports: [],
+      announcements: [],
+      meetings: []
+    };
+
+    const roleOptions = {
+      'Super Admin': [
+        { label: 'Create Schools', action: 'renderCreateSchools' },
+        { label: 'Create Principals', action: 'renderCreatePrincipals' },
+        { label: 'Create Admins', action: 'renderCreateAdmins' },
+        { label: 'Manage Subscriptions', action: 'renderManageSubscriptions' },
+        { label: 'View Total Students', action: 'renderViewTotalStudents' },
+        { label: 'View Total Teachers', action: 'renderViewTotalTeachers' },
+        { label: 'View Revenue Reports', action: 'renderViewRevenueReports' },
+        { label: 'System Settings', action: 'renderSystemSettings' },
+        { label: 'Backup & Restore', action: 'renderBackupRestore' },
+        { label: 'Audit Logs', action: 'renderAuditLogs' }
+      ],
+      'Principal': [
+        { label: 'Approve Admissions', action: 'renderApproveAdmissions' },
+        { label: 'Manage Teachers', action: 'renderManageTeachers' },
+        { label: 'Manage Classes', action: 'renderManageClasses' },
+        { label: 'Assign Class Teachers', action: 'renderAssignClassTeachers' },
+        { label: 'Generate Reports', action: 'renderGenerateReports' },
+        { label: 'Send Announcements', action: 'renderSendAnnouncements' },
+        { label: 'Approve Leave Requests', action: 'renderApproveLeaveRequests' }
+      ],
+      'Vice Principal': [
+        { label: 'Monitor Attendance', action: 'renderMonitorAttendance' },
+        { label: 'Check Teacher Performance', action: 'renderCheckTeacherPerformance' },
+        { label: 'Handle Discipline Cases', action: 'renderHandleDisciplineCases' },
+        { label: 'Schedule Exams', action: 'renderScheduleExams' },
+        { label: 'Review Academic Reports', action: 'renderReviewAcademicReports' }
+      ],
+      'Admin': [
+        { label: 'Student Records', action: 'renderStudentRecords' },
+        { label: 'Staff Records', action: 'renderStaffRecords' },
+        { label: 'Transport Management', action: 'renderTransportManagement' },
+        { label: 'Hostel Management', action: 'renderHostelManagement' },
+        { label: 'Inventory Management', action: 'renderInventoryManagement' },
+        { label: 'Certificate Generation', action: 'renderCertificateGeneration' }
+      ],
+      'Teacher': [
+        { label: 'Mark Attendance', action: 'renderMarkAttendance' },
+        { label: 'Enter Marks', action: 'renderEnterMarks' },
+        { label: 'Upload Assignments', action: 'renderUploadAssignments' },
+        { label: 'Create Exams', action: 'renderCreateExams' },
+        { label: 'Communicate with Parents', action: 'renderCommunicateWithParents' },
+        { label: 'Track Student Progress', action: 'renderTrackStudentProgress' }
+      ],
+      'Student': [
+        { label: 'View Attendance', action: 'renderViewStudentAttendance' },
+        { label: 'View Marks', action: 'renderViewStudentMarks' },
+        { label: 'View Timetable', action: 'renderViewStudentTimetable' },
+        { label: 'Download Study Materials', action: 'renderDownloadMaterials' },
+        { label: 'Submit Assignments', action: 'renderSubmitAssignments' },
+        { label: 'Pay Fees', action: 'renderPayStudentFees' },
+        { label: 'View Notifications', action: 'renderViewStudentNotifications' }
+      ],
+      'Parent': [
+        { label: 'Monitor Child Progress', action: 'renderMonitorChildProgress' },
+        { label: 'View Attendance', action: 'renderViewChildAttendance' },
+        { label: 'Pay Fees', action: 'renderPayChildFees' },
+        { label: 'Chat with Teachers', action: 'renderChatWithTeachers' },
+        { label: 'Download Report Cards', action: 'renderDownloadReportCards' }
+      ],
+      'Accountant': [
+        { label: 'Fee Collection', action: 'renderFeeCollection' },
+        { label: 'Salary Management', action: 'renderSalaryManagement' },
+        { label: 'Expense Tracking', action: 'renderExpenseTracking' },
+        { label: 'Financial Reports', action: 'renderFinancialReports' },
+        { label: 'Tax Reports', action: 'renderTaxReports' }
+      ]
+    };
+
+    function init() {
+      renderRoleSwitcher();
+      renderSidebar();
+      setRole(state.currentRole);
+      renderNotificationPanel();
+      document.getElementById('clearNotifications').addEventListener('click', () => {
+        state.notifications = [];
+        renderNotificationPanel();
+      });
+    }
+
+    function renderRoleSwitcher() {
+      const select = document.getElementById('roleSwitcher');
+      select.innerHTML = state.roles.map(role => `<option value="${role}">${role}</option>`).join('');
+      select.value = state.currentRole;
+      select.addEventListener('change', (event) => setRole(event.target.value));
+    }
+
+    function setRole(role) {
+      state.currentRole = role;
+      document.getElementById('currentRoleLabel').textContent = role;
+      document.getElementById('roleSwitcher').value = role;
+      renderSidebar();
+      const firstOption = roleOptions[role]?.[0]?.action;
+      if (firstOption && typeof window[firstOption] === 'function') {
+        window[firstOption]();
+      } else {
+        renderWorkspaceBanner(`${role} workspace ready. Select an option from the sidebar.`);
+      }
+      updateNotificationBadge();
+    }
+
+    function renderSidebar() {
+      const sidebar = document.getElementById('sidebarMenu');
+      const options = roleOptions[state.currentRole] || [];
+      sidebar.innerHTML = options.map(option => `
+        <button data-action="${option.action}" class="w-full text-left rounded-2xl px-4 py-3 bg-slate-900/90 hover:bg-slate-800 transition shadow-inner">
+          ${option.label}
+        </button>
+      `).join('');
+      sidebar.querySelectorAll('button').forEach(button => {
+        button.addEventListener('click', () => {
+          const action = button.dataset.action;
+          if (action && typeof window[action] === 'function') {
+            window[action]();
+          }
+        });
+      });
+    }
+
+    function clearWorkspace() {
+      document.getElementById('workspace').innerHTML = '';
+    }
+
+    function renderWorkspaceBanner(text) {
+      clearWorkspace();
+      const workspace = document.getElementById('workspace');
+      workspace.innerHTML = `
+        <div class="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div class="text-slate-900 text-2xl font-semibold mb-2">${text}</div>
+          <div class="text-slate-500">Use the sidebar to navigate between functional modules for the selected role.</div>
+        </div>
+      `;
+    }
+
+    function renderNotificationPanel() {
+      const list = document.getElementById('notificationList');
+      if (state.notifications.length === 0) {
+        list.innerHTML = '<div class="rounded-3xl border border-dashed border-slate-300 bg-white p-6 text-slate-500 text-center">No notifications yet.</div>';
+      } else {
+        list.innerHTML = state.notifications.map(item => `
+          <div class="notification-item rounded-3xl bg-white p-4 shadow-sm border border-slate-200">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <div class="font-semibold text-slate-900">${item.message}</div>
+                <div class="mt-2 text-xs text-slate-500">Channels: ${item.channels.join(', ')}</div>
+              </div>
+              <div class="text-xs text-slate-400">${item.time}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+      updateNotificationBadge();
+    }
+
+    function updateNotificationBadge() {
+      const badge = document.getElementById('notificationBadge');
+      badge.textContent = state.notifications.length;
+    }
+
+    function addNotification(message, channels = []) {
+      const event = { id: Date.now(), message, channels, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      state.notifications.unshift(event);
+      if (state.notifications.length > 50) state.notifications.pop();
+      renderNotificationPanel();
+    }
+
+    function renderCreateSchools() {
+      clearWorkspace();
+      const workspace = document.getElementById('workspace');
+      workspace.innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900 mb-2">Create New School</div>
+            <div class="text-slate-500">Register a new school with a license key and location details.</div>
+          </div>
+          <form id="createSchoolForm" class="grid gap-5 rounded-3xl bg-white p-8 shadow-sm border border-slate-200 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">School Name</span>
+              <input type="text" id="schoolName" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900 focus:outline-none" placeholder="Sunrise Academy" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Location</span>
+              <input type="text" id="schoolLocation" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900 focus:outline-none" placeholder="Downtown, Mumbai" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Board</span>
+              <select id="schoolBoard" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900 focus:outline-none">
+                <option>CBSE</option>
+                <option>ICSE</option>
+                <option>State Board</option>
+                <option>IB</option>
+              </select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">License Key</span>
+              <input type="text" id="schoolLicense" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900 focus:outline-none" placeholder="LIC-1234" />
+            </label>
+            <label class="space-y-2 md:col-span-2">
+              <span class="text-sm font-medium text-slate-700">Subscription Tier</span>
+              <select id="schoolTier" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900 focus:outline-none">
+                <option>Basic</option>
+                <option>Premium</option>
+                <option>Enterprise</option>
+              </select>
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Add New School</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('createSchoolForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const name = document.getElementById('schoolName').value.trim();
+        const location = document.getElementById('schoolLocation').value.trim();
+        const board = document.getElementById('schoolBoard').value;
+        const license = document.getElementById('schoolLicense').value.trim();
+        const tier = document.getElementById('schoolTier').value;
+        const id = `SCH${Math.floor(100 + Math.random() * 900)}`;
+        state.schools.push({ id, name, location, board, license, status: 'Active', tier });
+        addNotification(`[Super Admin created school] ${name} enrolled.`, ['Admin', 'Accountant']);
+        renderCreateSchools();
+        alert(`School ${name} successfully created with ID ${id}.`);
+      });
+    }
+
+    function renderCreatePrincipals() {
+      clearWorkspace();
+      const options = state.schools.filter(school => school.status === 'Active').map(school => `<option value="${school.id}">${school.name}</option>`).join('');
+      const workspace = document.getElementById('workspace');
+      workspace.innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Create Principal Account</div>
+          <div class="text-slate-500 mb-6">Link a master principal credential to an active registered school.</div>
+          <form id="createPrincipalForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Principal Name</span>
+              <input type="text" id="principalName" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Anita Desai" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Email</span>
+              <input type="email" id="principalEmail" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="anita@school.edu" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Active School</span>
+              <select id="principalSchool" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">
+                ${options}
+              </select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Login Key</span>
+              <input type="text" id="principalKey" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="PRN-4567" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Create Principal</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('createPrincipalForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const name = document.getElementById('principalName').value.trim();
+        const email = document.getElementById('principalEmail').value.trim();
+        const schoolId = document.getElementById('principalSchool').value;
+        const id = `PRN${Math.floor(100 + Math.random() * 900)}`;
+        state.principals.push({ id, name, email, schoolId });
+        addNotification(`[Super Admin created principal] ${name} assigned to school ${schoolId}.`, ['Admin']);
+        renderCreatePrincipals();
+        alert(`Principal ${name} created and linked to school ${schoolId}.`);
+      });
+    }
+
+    function renderCreateAdmins() {
+      clearWorkspace();
+      const workspace = document.getElementById('workspace');
+      workspace.innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Create Admin Profile</div>
+          <div class="text-slate-500 mb-6">Register internal administrative staff profiles for system operations.</div>
+          <form id="createAdminForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Admin Name</span>
+              <input type="text" id="adminName" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Rohan Mehta" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Email</span>
+              <input type="email" id="adminEmail" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="rohan.admin@school.edu" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Department</span>
+              <input type="text" id="adminDepartment" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Exams / Admissions" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Employee ID</span>
+              <input type="text" id="adminId" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="ADM-210" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="inline-flex items-center justify-center rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Register Admin</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('createAdminForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const id = document.getElementById('adminId').value.trim();
+        const name = document.getElementById('adminName').value.trim();
+        const email = document.getElementById('adminEmail').value.trim();
+        const department = document.getElementById('adminDepartment').value.trim();
+        state.admins.push({ id, name, email, department });
+        addNotification(`[Super Admin created admin] ${name} onboarded to ${department}.`, ['Principal', 'Admin']);
+        renderCreateAdmins();
+        alert(`Admin profile for ${name} saved successfully.`);
+      });
+    }
+
+    function renderManageSubscriptions() {
+      clearWorkspace();
+      const rows = state.schools.map((school) => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${school.id}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${school.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${school.tier}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${school.status}</td>
+          <td class="px-4 py-3 text-right">
+            <button onclick="toggleSchoolStatus('${school.id}')" class="rounded-2xl px-4 py-2 text-sm font-semibold ${school.status === 'Active' ? 'bg-amber-500 text-slate-950' : 'bg-emerald-600 text-white'} hover:opacity-90 transition">${school.status === 'Active' ? 'Suspend School' : 'Activate'}</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-6">
+            <div>
+              <div class="text-2xl font-semibold text-slate-900">Manage Subscriptions</div>
+              <div class="text-slate-500">Toggle active school plans and control access instantly.</div>
+            </div>
+          </div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200">
+            <table class="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead class="bg-slate-50 text-slate-600">
+                <tr>
+                  <th class="px-4 py-3">School ID</th>
+                  <th class="px-4 py-3">School Name</th>
+                  <th class="px-4 py-3">Plan Tier</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function toggleSchoolStatus(id) {
+      const school = state.schools.find(item => item.id === id);
+      if (!school) return;
+      school.status = school.status === 'Active' ? 'Suspended' : 'Active';
+      addNotification(`[Super Admin changed subscription] ${school.name} is now ${school.status}.`, ['Admin', 'Accountant']);
+      renderManageSubscriptions();
+    }
+
+    function renderViewTotalStudents() {
+      clearWorkspace();
+      const total = state.students.length;
+      const byGrade = state.students.reduce((acc, student) => {
+        acc[student.grade] = (acc[student.grade] || 0) + 1;
+        return acc;
+      }, {});
+      const gradeRows = Object.entries(byGrade).map(([grade, count]) => `<div class="rounded-3xl bg-slate-900/5 p-4">Grade ${grade}: <span class="font-semibold">${count} students</span></div>`).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Total Students</div>
+            <div class="mt-4 text-5xl font-semibold text-slate-900">${total}</div>
+            <div class="mt-2 text-slate-500">Across the complete platform.</div>
+          </div>
+          <div class="lg:col-span-2 rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500 mb-4">Student distribution by grade</div>
+            <div class="grid gap-4 md:grid-cols-3">${gradeRows}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderViewTotalTeachers() {
+      clearWorkspace();
+      const total = state.teachers.length;
+      const subjectCounts = state.teachers.reduce((acc, teacher) => {
+        teacher.subjects.forEach(subject => { acc[subject] = (acc[subject] || 0) + 1; });
+        return acc;
+      }, {});
+      const subjectRows = Object.entries(subjectCounts).map(([subject, count]) => `<div class="rounded-3xl bg-slate-900/5 p-4">${subject}: <span class="font-semibold">${count}</span></div>`).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="grid gap-6 lg:grid-cols-3">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Total Teachers</div>
+            <div class="mt-4 text-5xl font-semibold text-slate-900">${total}</div>
+            <div class="mt-2 text-slate-500">Active staff in the system.</div>
+          </div>
+          <div class="lg:col-span-2 rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500 mb-4">Subject coverage</div>
+            <div class="grid gap-4 md:grid-cols-3">${subjectRows}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderViewRevenueReports() {
+      clearWorkspace();
+      const paidTotal = state.financials.fees.filter(item => item.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
+      const pendingTotal = state.financials.fees.filter(item => item.status !== 'Paid').reduce((sum, item) => sum + item.amount, 0);
+      const revenueRows = state.financials.fees.map(record => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${record.student}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${record.type}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">₹${record.amount.toLocaleString()}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${record.dueDate}</td>
+          <td class="px-4 py-3 text-sm ${record.status === 'Paid' ? 'text-emerald-700' : 'text-amber-700'}">${record.status}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="grid gap-6 xl:grid-cols-3">
+            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+              <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Collected Revenue</div>
+              <div class="mt-4 text-4xl font-semibold text-slate-900">₹${paidTotal.toLocaleString()}</div>
+            </div>
+            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+              <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Pending Revenue</div>
+              <div class="mt-4 text-4xl font-semibold text-slate-900">₹${pendingTotal.toLocaleString()}</div>
+            </div>
+            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+              <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Total Items</div>
+              <div class="mt-4 text-4xl font-semibold text-slate-900">${state.financials.fees.length}</div>
+            </div>
+          </div>
+          <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200 overflow-x-auto">
+            <div class="text-lg font-semibold text-slate-900 mb-4">Fee Collection Records</div>
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Student</th>
+                  <th class="px-4 py-3">Fee Type</th>
+                  <th class="px-4 py-3">Amount</th>
+                  <th class="px-4 py-3">Due Date</th>
+                  <th class="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>${revenueRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSystemSettings() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900 mb-2">System Settings</div>
+            <div class="text-slate-500">Configure branding controls and reset access across the school management engine.</div>
+          </div>
+          <div class="grid gap-6 lg:grid-cols-2">
+            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 space-y-5">
+              <div class="text-lg font-semibold text-slate-900">Global Flags</div>
+              <label class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4 bg-slate-50">
+                <span class="text-slate-700">Maintenance Mode</span>
+                <input id="maintenanceToggle" type="checkbox" class="h-5 w-5 text-slate-900" />
+              </label>
+              <label class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 p-4 bg-slate-50">
+                <span class="text-slate-700">Enable SMS Alerts</span>
+                <input id="smsToggle" type="checkbox" checked class="h-5 w-5 text-slate-900" />
+              </label>
+            </div>
+            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 space-y-5">
+              <div class="text-lg font-semibold text-slate-900">Branding</div>
+              <label class="space-y-2">
+                <span class="text-sm text-slate-700">Primary Theme Color</span>
+                <input type="color" id="themeColor" value="#0f172a" class="w-full h-12 rounded-2xl border border-slate-300" />
+              </label>
+              <label class="space-y-2">
+                <span class="text-sm text-slate-700">Default School Logo URL</span>
+                <input type="url" id="logoUrl" class="w-full rounded-2xl border border-slate-300 px-4 py-3" placeholder="https://..." />
+              </label>
+              <button id="resetPasswords" class="inline-flex items-center justify-center rounded-2xl bg-rose-500 px-5 py-3 text-sm font-semibold text-white hover:bg-rose-600 transition">Reset Passwords</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('resetPasswords').addEventListener('click', () => {
+        addNotification('[System reset passwords] Master password reset initiated.', ['Admin', 'Principal']);
+        alert('All user passwords have been reset to the default secure temporary token.');
+      });
+    }
+
+    function renderBackupRestore() {
+      clearWorkspace();
+      const logRows = state.auditLogs.map(entry => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.id}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.action}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.time}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.ip}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div class="text-2xl font-semibold text-slate-900">Backup & Restore</div>
+              <div class="text-slate-500">Run manual backups or restore from recorded audit points.</div>
+            </div>
+            <div class="flex flex-wrap gap-3">
+              <button onclick="manualBackup()" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Manual Backup Now</button>
+              <button onclick="restoreFromPoint()" class="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition">Restore from Point</button>
+            </div>
+          </div>
+          <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200 overflow-x-auto">
+            <div class="text-lg font-semibold text-slate-900 mb-4">Backup Logs</div>
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Backup ID</th>
+                  <th class="px-4 py-3">Activity</th>
+                  <th class="px-4 py-3">Time</th>
+                  <th class="px-4 py-3">IP</th>
+                </tr>
+              </thead>
+              <tbody>${logRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function manualBackup() {
+      const newEntry = { id: `AL${Math.floor(100 + Math.random()*900)}`, action: 'Manual backup executed', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), ip: '192.168.1.99' };
+      state.auditLogs.unshift(newEntry);
+      addNotification('[System backup] Manual backup completed successfully.', ['Admin']);
+      renderBackupRestore();
+    }
+
+    function restoreFromPoint() {
+      addNotification('[System restore] Restore action completed.', ['Admin', 'Super Admin']);
+      alert('System restored from the selected restore point.');
+      renderBackupRestore();
+    }
+
+    function renderAuditLogs() {
+      clearWorkspace();
+      const rows = state.auditLogs.map(entry => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.id}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.action}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.time}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.ip}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-3">Audit Logs</div>
+          <div class="text-slate-500 mb-6">Activity tracking stream with user actions, timestamps, and source IP.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Log ID</th>
+                  <th class="px-4 py-3">Action</th>
+                  <th class="px-4 py-3">Timestamp</th>
+                  <th class="px-4 py-3">IP Address</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderApproveAdmissions() {
+      clearWorkspace();
+      const rows = state.pendingAdmissions.map(admission => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${admission.admissionNumber}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${admission.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">Grade ${admission.grade} ${admission.section}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${admission.parent}</td>
+          <td class="px-4 py-3 text-right space-x-2">
+            <button onclick="approveAdmission('${admission.admissionNumber}')" class="rounded-2xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button>
+            <button onclick="rejectAdmission('${admission.admissionNumber}')" class="rounded-2xl bg-rose-500 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-600">Reject</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Approve Admissions</div>
+          <div class="text-slate-500 mb-6">Review incoming student profiles and approve or reject requests.</div>
+          ${state.pendingAdmissions.length === 0 ? '<div class="rounded-3xl bg-slate-50 p-6 text-slate-500">No pending admissions at the moment.</div>' : `
+            <div class="overflow-x-auto rounded-3xl border border-slate-200">
+              <table class="min-w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="px-4 py-3">Admission No.</th>
+                    <th class="px-4 py-3">Student</th>
+                    <th class="px-4 py-3">Grade / Section</th>
+                    <th class="px-4 py-3">Parent</th>
+                    <th class="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function approveAdmission(admissionNumber) {
+      const index = state.pendingAdmissions.findIndex(item => item.admissionNumber === admissionNumber);
+      if (index < 0) return;
+      const admission = state.pendingAdmissions.splice(index, 1)[0];
+      const newStudent = {
+        admissionNumber: admission.admissionNumber,
+        name: admission.name,
+        grade: admission.grade,
+        section: admission.section,
+        parent: { name: admission.parent, contact: 'Not Available' },
+        attendance: { present: 0, absent: 0, late: 0 },
+        marks: {},
+        status: 'Active'
+      };
+      state.students.push(newStudent);
+      addNotification('[Principal approved admission] New student onboarded.', ['Admin', 'Parent', 'Accountant']);
+      renderApproveAdmissions();
+    }
+
+    function rejectAdmission(admissionNumber) {
+      state.pendingAdmissions = state.pendingAdmissions.filter(item => item.admissionNumber !== admissionNumber);
+      addNotification('[Principal rejected admission] Admission application declined.', ['Parent']);
+      renderApproveAdmissions();
+    }
+
+    function renderManageTeachers() {
+      clearWorkspace();
+      const rows = state.teachers.map(teacher => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${teacher.employeeId}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${teacher.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${teacher.subjects.join(', ')}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">₹${teacher.salary.toLocaleString()}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${teacher.leaveStatus}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div>
+              <div class="text-2xl font-semibold text-slate-900">Manage Teachers</div>
+              <div class="text-slate-500">Roster manager with quick teacher registration.</div>
+            </div>
+            <button onclick="renderAddTeacherForm()" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Add Teacher</button>
+          </div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Employee ID</th>
+                  <th class="px-4 py-3">Name</th>
+                  <th class="px-4 py-3">Subjects</th>
+                  <th class="px-4 py-3">Salary</th>
+                  <th class="px-4 py-3">Leave</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAddTeacherForm() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Add Teacher</div>
+          <div class="text-slate-500 mb-6">Enter teacher profile and assign subjects.</div>
+          <form id="addTeacherForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Employee ID</span>
+              <input type="text" id="teacherEmployeeId" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="TCH103" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Name</span>
+              <input type="text" id="teacherName" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Sneha Rao" />
+            </label>
+            <label class="space-y-2 md:col-span-2">
+              <span class="text-sm font-medium text-slate-700">Subjects</span>
+              <input type="text" id="teacherSubjects" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Mathematics, Science" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Salary</span>
+              <input type="number" id="teacherSalary" required class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="65000" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Save Teacher</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('addTeacherForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const id = document.getElementById('teacherEmployeeId').value.trim();
+        const name = document.getElementById('teacherName').value.trim();
+        const subjects = document.getElementById('teacherSubjects').value.split(',').map(item => item.trim()).filter(Boolean);
+        const salary = Number(document.getElementById('teacherSalary').value.trim());
+        state.teachers.push({ employeeId: id, name, subjects, salary, leaveStatus: 'None', assignedClasses: [] });
+        addNotification(`[Principal added teacher] ${name} joined the faculty.`, ['Admin']);
+        renderManageTeachers();
+        alert(`Teacher ${name} added successfully.`);
+      });
+    }
+
+    function renderManageClasses() {
+      clearWorkspace();
+      const classes = [
+        { grade: '4', sections: 3, students: 78 },
+        { grade: '5', sections: 4, students: 95 },
+        { grade: '6', sections: 3, students: 89 }
+      ];
+      const cards = classes.map(item => `
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Grade ${item.grade}</div>
+          <div class="mt-4 text-4xl font-semibold text-slate-900">${item.sections} sections</div>
+          <div class="mt-2 text-slate-500">${item.students} students enrolled</div>
+        </div>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Manage Classes</div>
+            <div class="text-slate-500">Active grade and section mapping for the school.</div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-3">${cards}</div>
+        </div>
+      `;
+    }
+
+    function renderAssignClassTeachers() {
+      clearWorkspace();
+      const teacherOptions = state.teachers.map(teacher => `<option value="${teacher.employeeId}">${teacher.name} (${teacher.employeeId})</option>`).join('');
+      const workspace = document.getElementById('workspace');
+      workspace.innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Assign Class Teachers</div>
+          <div class="text-slate-500 mb-6">Match a teacher to a grade and section quickly.</div>
+          <form id="assignTeacherForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Teacher</span>
+              <select id="teacherSelect" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">${teacherOptions}</select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Grade / Section</span>
+              <input type="text" id="classTarget" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="e.g. 5A" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Assign Teacher</button>
+            </div>
+          </form>
+          <div class="mt-8">
+            <div class="text-lg font-semibold text-slate-900 mb-4">Current Assignments</div>
+            <div class="grid gap-4 md:grid-cols-2">${state.teachers.map(teacher => `
+              <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <div class="font-semibold text-slate-900">${teacher.name}</div>
+                <div class="text-sm text-slate-500">${teacher.assignedClasses.length ? teacher.assignedClasses.join(', ') : 'Not assigned yet'}</div>
+              </div>
+            `).join('')}</div>
+          </div>
+        </div>
+      `;
+      document.getElementById('assignTeacherForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const teacherId = document.getElementById('teacherSelect').value;
+        const target = document.getElementById('classTarget').value.trim();
+        const teacher = state.teachers.find(item => item.employeeId === teacherId);
+        if (teacher && target) {
+          teacher.assignedClasses.push(target);
+          addNotification(`[Principal assigned class teacher] ${teacher.name} to ${target}.`, ['Admin']);
+          renderAssignClassTeachers();
+          alert(`${teacher.name} has been assigned to ${target}.`);
+        }
+      });
+    }
+
+    function renderGenerateReports() {
+      clearWorkspace();
+      const studentOptions = state.students.map(student => `<option value="${student.admissionNumber}">${student.name}</option>`).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Generate Reports</div>
+          <div class="text-slate-500 mb-6">Filter and export historical attendance and academic logs.</div>
+          <form id="reportFilterForm" class="grid gap-5 md:grid-cols-3">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Student</span>
+              <select id="reportStudent" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">${studentOptions}</select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Report Type</span>
+              <select id="reportType" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">
+                <option>Attendance Summary</option>
+                <option>Academic Performance</option>
+                <option>Combined Report</option>
+              </select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Date Range</span>
+              <input type="month" id="reportMonth" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" />
+            </label>
+            <div class="md:col-span-3 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Generate Report</button>
+            </div>
+          </form>
+          <div id="reportOutput" class="mt-8"></div>
+        </div>
+      `;
+      document.getElementById('reportFilterForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const studentId = document.getElementById('reportStudent').value;
+        const type = document.getElementById('reportType').value;
+        const month = document.getElementById('reportMonth').value || '2026-06';
+        const student = state.students.find(item => item.admissionNumber === studentId);
+        const output = `
+          <div class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+            <div class="text-lg font-semibold text-slate-900">${type} for ${student.name}</div>
+            <div class="mt-3 text-slate-600">Month: ${month}</div>
+            <div class="mt-4 text-slate-700">Attendance: ${student.attendance.present} present, ${student.attendance.absent} absent, ${student.attendance.late} late.</div>
+            <div class="mt-2 text-slate-700">Marks: ${Object.entries(student.marks).map(([subject, score]) => `${subject} ${score}`).join(', ')}</div>
+          </div>
+        `;
+        document.getElementById('reportOutput').innerHTML = output;
+        addNotification('[Principal generated report] A student report was created.', ['Admin']);
+      });
+    }
+
+    function renderSendAnnouncements() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Send Announcements</div>
+          <div class="text-slate-500 mb-6">Compose and publish school-wide announcements instantly.</div>
+          <form id="announcementForm" class="grid gap-5">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Category</span>
+              <select id="announcementCategory" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">
+                <option>General</option>
+                <option>Exam Alert</option>
+                <option>Fee Notice</option>
+                <option>Event Update</option>
+              </select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Message</span>
+              <textarea id="announcementMessage" rows="5" class="w-full rounded-3xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Write announcement details here..."></textarea>
+            </label>
+            <div class="flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Publish Announcement</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('announcementForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const category = document.getElementById('announcementCategory').value;
+        const message = document.getElementById('announcementMessage').value.trim();
+        if (!message) return;
+        state.announcements.unshift({ id: `ANN${Date.now()}`, category, message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+        addNotification('[Principal published announcement] New announcement sent.', ['Teacher', 'Student', 'Parent']);
+        renderSendAnnouncements();
+        alert('Announcement published successfully.');
+      });
+    }
+
+    function renderApproveLeaveRequests() {
+      clearWorkspace();
+      const rows = state.leaveRequests.map(request => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${request.teacher}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${request.date}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${request.reason}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${request.status}</td>
+          <td class="px-4 py-3 text-right space-x-2">
+            <button onclick="respondLeaveRequest('${request.id}','Approved')" class="rounded-2xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">Approve</button>
+            <button onclick="respondLeaveRequest('${request.id}','Denied')" class="rounded-2xl bg-rose-500 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-600">Deny</button>
+          </td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Approve Leave Requests</div>
+          <div class="text-slate-500 mb-6">Manage pending leave requests from teaching staff.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Teacher</th>
+                  <th class="px-4 py-3">Date</th>
+                  <th class="px-4 py-3">Reason</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function respondLeaveRequest(id, result) {
+      const request = state.leaveRequests.find(item => item.id === id);
+      if (!request) return;
+      request.status = result;
+      addNotification(`[Principal ${result.toLowerCase()} leave] ${request.teacher}'s leave request has been ${result.toLowerCase()}.`, ['Teacher', 'Admin']);
+      renderApproveLeaveRequests();
+    }
+
+    function renderMonitorAttendance() {
+      clearWorkspace();
+      const classSummary = [
+        { classLabel: 'Grade 4A', present: 27, absent: 3, late: 0 },
+        { classLabel: 'Grade 5B', present: 29, absent: 1, late: 2 },
+        { classLabel: 'Grade 6C', present: 26, absent: 4, late: 1 }
+      ];
+      const cards = classSummary.map(item => `
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="text-lg font-semibold text-slate-900">${item.classLabel}</div>
+          <div class="mt-4 grid gap-3 sm:grid-cols-3">
+            <div class="rounded-2xl bg-slate-50 p-3 text-slate-700">Present: <span class="font-semibold">${item.present}</span></div>
+            <div class="rounded-2xl bg-slate-50 p-3 text-slate-700">Absent: <span class="font-semibold">${item.absent}</span></div>
+            <div class="rounded-2xl bg-slate-50 p-3 text-slate-700">Late: <span class="font-semibold">${item.late}</span></div>
+          </div>
+        </div>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Monitor Attendance</div>
+            <div class="text-slate-500">Class-by-class attendance analytics for the day.</div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">${cards}</div>
+        </div>
+      `;
+    }
+
+    function renderCheckTeacherPerformance() {
+      clearWorkspace();
+      const rows = state.teachers.map(teacher => `
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="font-semibold text-slate-900">${teacher.name}</div>
+          <div class="mt-2 text-sm text-slate-500">Subjects: ${teacher.subjects.join(', ')}</div>
+          <div class="mt-4 text-sm text-slate-500">Lesson completion</div>
+          <div class="mt-2 h-3 overflow-hidden rounded-full bg-slate-200">
+            <div class="h-full rounded-full bg-emerald-500" style="width: ${Math.min(100, 65 + teacher.assignedClasses.length * 10)}%"></div>
+          </div>
+          <div class="mt-2 text-xs text-slate-500">Completed ${65 + teacher.assignedClasses.length * 10}% of weekly modules.</div>
+        </div>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Check Teacher Performance</div>
+            <div class="text-slate-500">Lesson plan completions and schedule adherence metrics.</div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-2">${rows}</div>
+        </div>
+      `;
+    }
+
+    function renderHandleDisciplineCases() {
+      clearWorkspace();
+      const cases = [
+        { id: 'DC101', student: 'Aarav Singh', issue: 'Class disruption', status: 'Investigating' },
+        { id: 'DC102', student: 'Meera Sharma', issue: 'Homework missing', status: 'Resolved' }
+      ];
+      const rows = cases.map(item => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${item.id}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${item.student}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${item.issue}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${item.status}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Handle Discipline Cases</div>
+          <div class="text-slate-500 mb-6">Track behavioral incidents escalated by classrooms.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Case ID</th>
+                  <th class="px-4 py-3">Student</th>
+                  <th class="px-4 py-3">Issue</th>
+                  <th class="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderScheduleExams() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Schedule Exams</div>
+            <div class="text-slate-500">Plan exam names, dates, rooms and passing thresholds.</div>
+          </div>
+          <form id="examForm" class="grid gap-5 md:grid-cols-2 bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Exam Name</span>
+              <input type="text" id="examName" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Term 2 Math" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Date</span>
+              <input type="date" id="examDate" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Room</span>
+              <input type="text" id="examRoom" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Room 205" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Passing Threshold</span>
+              <input type="number" id="examThreshold" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="35" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Save Exam</button>
+            </div>
+          </form>
+          <div id="examPlanner" class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200"></div>
+        </div>
+      `;
+      document.getElementById('examForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const examName = document.getElementById('examName').value.trim();
+        const examDate = document.getElementById('examDate').value;
+        const examRoom = document.getElementById('examRoom').value.trim();
+        const threshold = document.getElementById('examThreshold').value.trim();
+        if (!examName || !examDate || !examRoom || !threshold) return;
+        const exam = { id: `EX${Date.now()}`, examName, examDate, examRoom, threshold };
+        state.reports.push(exam);
+        addNotification('[Vice Principal scheduled exam] ' + examName + ' scheduled.', ['Teacher', 'Student']);
+        document.getElementById('examPlanner').innerHTML = `
+          <div class="text-slate-700">Saved exam: <span class="font-semibold">${examName}</span> on ${examDate} in ${examRoom} with threshold ${threshold}%.</div>
+        `;
+      });
+    }
+
+    function renderReviewAcademicReports() {
+      clearWorkspace();
+      const average = Math.round((Object.values(state.students.reduce((acc, student) => {
+        Object.entries(student.marks).forEach(([subject, score]) => {
+          acc[subject] = acc[subject] || { total: 0, count: 0 };
+          acc[subject].total += score;
+          acc[subject].count += 1;
+        });
+        return acc;
+      }, {})).map(item => item.total / item.count).reduce((sum, value) => sum + value, 0) / Object.keys(state.students[0].marks).length));
+      const subjectAverages = Object.entries(state.students.reduce((acc, student) => {
+        Object.entries(student.marks).forEach(([subject, score]) => {
+          acc[subject] = acc[subject] || { total: 0, count: 0 };
+          acc[subject].total += score;
+          acc[subject].count += 1;
+        });
+        return acc;
+      }, {})).map(([subject, metric]) => ({ subject, average: Math.round(metric.total / metric.count) }));
+      const cards = subjectAverages.map(item => `
+        <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
+          <div class="text-sm uppercase tracking-[0.2em] text-slate-500">${item.subject}</div>
+          <div class="mt-4 text-3xl font-semibold text-slate-900">${item.average}%</div>
+        </div>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Review Academic Reports</div>
+            <div class="text-slate-500">School-wide grade curves and averages.</div>
+          </div>
+          <div class="grid gap-6 lg:grid-cols-3">
+            <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+              <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Average GPA Estimate</div>
+              <div class="mt-4 text-5xl font-semibold text-slate-900">${average}%</div>
+            </div>
+            ${cards}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderStudentRecords() {
+      clearWorkspace();
+      const rows = state.students.map(student => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${student.admissionNumber}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${student.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">Grade ${student.grade}${student.section}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${student.parent.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${student.status}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <div class="text-2xl font-semibold text-slate-900">Student Records</div>
+                <div class="text-slate-500">Searchable ledger of all active pupil profiles.</div>
+              </div>
+              <div class="text-sm text-slate-500">Total students: ${state.students.length}</div>
+            </div>
+          </div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Admission No.</th>
+                  <th class="px-4 py-3">Name</th>
+                  <th class="px-4 py-3">Grade</th>
+                  <th class="px-4 py-3">Parent</th>
+                  <th class="px-4 py-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderStaffRecords() {
+      clearWorkspace();
+      const staffRecords = [...state.teachers.map(t => ({ id: t.employeeId, name: t.name, role: 'Teacher', documents: 'Verified' })), ...state.admins.map(a => ({ id: a.id, name: a.name, role: 'Admin', documents: 'Verified' })), ...state.principals.map(p => ({ id: p.id, name: p.name, role: 'Principal', documents: 'Verified' }))];
+      const rows = staffRecords.map(record => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${record.id}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${record.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${record.role}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${record.documents}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Staff Records</div>
+          <div class="text-slate-500 mb-6">HR profile list of employees and compliance statuses.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Employee ID</th>
+                  <th class="px-4 py-3">Name</th>
+                  <th class="px-4 py-3">Role</th>
+                  <th class="px-4 py-3">Compliance</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTransportManagement() {
+      clearWorkspace();
+      const routes = [
+        { id: 'R001', route: 'North Zone', bus: 'Bus 12', driver: 'Rajesh', seats: 42 },
+        { id: 'R002', route: 'East Zone', bus: 'Bus 08', driver: 'Suman', seats: 38 }
+      ];
+      const rows = routes.map(route => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${route.id}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${route.route}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${route.bus}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${route.driver}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${route.seats}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div class="text-2xl font-semibold text-slate-900">Transport Management</div>
+              <div class="text-slate-500">Assign, edit, and save bus routes and fleet details.</div>
+            </div>
+            <button onclick="renderAddRouteForm()" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Add Route</button>
+          </div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Route ID</th>
+                  <th class="px-4 py-3">Route</th>
+                  <th class="px-4 py-3">Bus</th>
+                  <th class="px-4 py-3">Driver</th>
+                  <th class="px-4 py-3">Seats</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAddRouteForm() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Add Transport Route</div>
+          <div class="text-slate-500 mb-6">Enter route details and save to the transport planner.</div>
+          <form id="routeForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Route Name</span>
+              <input type="text" id="routeName" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="North Zone" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Bus Number</span>
+              <input type="text" id="routeBus" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Bus 22" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Driver Name</span>
+              <input type="text" id="routeDriver" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Rajesh" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Capacity</span>
+              <input type="number" id="routeSeats" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="42" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Save Route</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('routeForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        addNotification('[Admin added transport route] New route created.', ['Parent', 'Student']);
+        alert('Transport route added successfully.');
+        renderTransportManagement();
+      });
+    }
+
+    function renderHostelManagement() {
+      clearWorkspace();
+      const rooms = [
+        { room: '101A', floor: 1, occupancy: 2, capacity: 3 },
+        { room: '102B', floor: 1, occupancy: 3, capacity: 3 },
+        { room: '201C', floor: 2, occupancy: 1, capacity: 3 }
+      ];
+      const cards = rooms.map(room => `
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="text-lg font-semibold text-slate-900">Room ${room.room}</div>
+          <div class="mt-2 text-slate-500">Floor ${room.floor}</div>
+          <div class="mt-4 text-slate-700">Occupancy: ${room.occupancy}/${room.capacity}</div>
+        </div>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Hostel Management</div>
+            <div class="text-slate-500">Room allocation grid and bed occupancy mapping.</div>
+          </div>
+          <div class="grid gap-6 md:grid-cols-2">${cards}</div>
+        </div>
+      `;
+    }
+
+    function renderInventoryManagement() {
+      clearWorkspace();
+      const inventoryItems = [
+        { item: 'Science Lab Microscope', quantity: 12, vendor: 'EduSupplies' },
+        { item: 'Library Books', quantity: 1520, vendor: 'ReadWell' },
+        { item: 'Desktop Computers', quantity: 28, vendor: 'TechWorks' }
+      ];
+      const rows = inventoryItems.map(entry => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.item}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.quantity}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${entry.vendor}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Inventory Management</div>
+          <div class="text-slate-500 mb-6">Asset list for equipment, lab materials, and vendor pipelines.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Asset</th>
+                  <th class="px-4 py-3">Quantity</th>
+                  <th class="px-4 py-3">Vendor</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCertificateGeneration() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Certificate Generation</div>
+            <div class="text-slate-500">Produce printable student ID cards and transfer certificates.</div>
+          </div>
+          <form id="certificateForm" class="grid gap-5 md:grid-cols-2 bg-white rounded-3xl p-8 shadow-sm border border-slate-200">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Certificate Type</span>
+              <select id="certificateType" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">
+                <option>Transfer Certificate</option>
+                <option>Student ID Card</option>
+              </select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Student</span>
+              <select id="certificateStudent" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">
+                ${state.students.map(student => `<option value="${student.admissionNumber}">${student.name}</option>`).join('')}
+              </select>
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Generate Certificate</button>
+            </div>
+          </form>
+          <div id="certificatePreview" class="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm"></div>
+        </div>
+      `;
+      document.getElementById('certificateForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const type = document.getElementById('certificateType').value;
+        const studentId = document.getElementById('certificateStudent').value;
+        const student = state.students.find(item => item.admissionNumber === studentId);
+        document.getElementById('certificatePreview').innerHTML = `
+          <div class="space-y-3">
+            <div class="text-lg font-semibold text-slate-900">${type}</div>
+            <div class="text-slate-700">Student Name: <strong>${student.name}</strong></div>
+            <div class="text-slate-700">Admission No: <strong>${student.admissionNumber}</strong></div>
+            <div class="text-slate-700">Grade / Section: <strong>${student.grade}${student.section}</strong></div>
+            <div class="text-slate-700">Issued: <strong>${new Date().toLocaleDateString()}</strong></div>
+            <button class="mt-4 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Download PDF</button>
+          </div>
+        `;
+        addNotification(`[Admin generated certificate] ${type} for ${student.name}.`, ['Parent']);
+      });
+    }
+
+    function renderMarkAttendance() {
+      clearWorkspace();
+      const selectedClass = '5A';
+      const classStudents = state.students.filter(item => item.grade === '5');
+      const rows = classStudents.map(student => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${student.admissionNumber}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${student.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700"><input type="radio" name="attendance-${student.admissionNumber}" value="Present" checked class="mr-2" />Present</td>
+          <td class="px-4 py-3 text-sm text-slate-700"><input type="radio" name="attendance-${student.admissionNumber}" value="Absent" class="mr-2" />Absent</td>
+          <td class="px-4 py-3 text-sm text-slate-700"><input type="radio" name="attendance-${student.admissionNumber}" value="Late" class="mr-2" />Late</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Mark Attendance</div>
+          <div class="text-slate-500 mb-6">Select status for each student in class ${selectedClass}.</div>
+          <form id="attendanceForm">
+            <div class="overflow-x-auto rounded-3xl border border-slate-200">
+              <table class="min-w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="px-4 py-3">Admission No.</th>
+                    <th class="px-4 py-3">Student</th>
+                    <th class="px-4 py-3">Present</th>
+                    <th class="px-4 py-3">Absent</th>
+                    <th class="px-4 py-3">Late</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <div class="mt-6 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Save Attendance</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('attendanceForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        classStudents.forEach(student => {
+          const status = document.querySelector(`input[name="attendance-${student.admissionNumber}"]:checked`).value;
+          if (status === 'Present') student.attendance.present += 1;
+          if (status === 'Absent') student.attendance.absent += 1;
+          if (status === 'Late') student.attendance.late += 1;
+        });
+        addNotification('[Teacher marked attendance] Attendance updated for class 5A.', ['Vice Principal']);
+        alert('Attendance saved successfully.');
+      });
+    }
+
+    function renderEnterMarks() {
+      clearWorkspace();
+      const subject = 'Mathematics';
+      const rows = state.students.map(student => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${student.admissionNumber}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${student.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700"><input type="number" name="mark-${student.admissionNumber}" value="${student.marks[subject] || ''}" min="0" max="100" class="w-20 rounded-2xl border border-slate-300 px-3 py-2" /></td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Enter Marks</div>
+          <div class="text-slate-500 mb-6">Quickly save test scores for ${subject}.</div>
+          <form id="marksForm">
+            <div class="overflow-x-auto rounded-3xl border border-slate-200">
+              <table class="min-w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="px-4 py-3">Admission No.</th>
+                    <th class="px-4 py-3">Student</th>
+                    <th class="px-4 py-3">${subject}</th>
+                  </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+            <div class="mt-6 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Save Marks</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('marksForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        state.students.forEach(student => {
+          const value = document.querySelector(`input[name="mark-${student.admissionNumber}"]`).value;
+          student.marks[subject] = Number(value);
+        });
+        addNotification('[Teacher submitted marks] Mathematics marks updated.', ['Principal']);
+        alert('Marks saved successfully.');
+      });
+    }
+
+    function renderUploadAssignments() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 space-y-6">
+          <div>
+            <div class="text-2xl font-semibold text-slate-900">Upload Assignments</div>
+            <div class="text-slate-500">Post homework, attach documents, and set deadlines.</div>
+          </div>
+          <form id="uploadAssignmentForm" class="grid gap-5">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Assignment Title</span>
+              <input type="text" id="assignmentTitle" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Chapter 6 Summary" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Description</span>
+              <textarea id="assignmentDescription" rows="4" class="w-full rounded-3xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Describe the homework requirements..."></textarea>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Deadline</span>
+              <input type="date" id="assignmentDeadline" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Attach File</span>
+              <input type="file" id="assignmentFile" class="w-full text-slate-700" />
+            </label>
+            <div class="flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Upload Assignment</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('uploadAssignmentForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const title = document.getElementById('assignmentTitle').value.trim();
+        const desc = document.getElementById('assignmentDescription').value.trim();
+        const deadline = document.getElementById('assignmentDeadline').value;
+        const fileInput = document.getElementById('assignmentFile');
+        if (!title || !desc || !deadline) return;
+        const file = fileInput.files[0];
+        state.assignments.push({ id: `ASG${Date.now()}`, title, description: desc, deadline, file: file ? file.name : 'None', createdBy: 'Teacher' });
+        addNotification('[Teacher uploaded homework] New assignment posted.', ['Student', 'Parent']);
+        alert('Assignment uploaded successfully.');
+        renderUploadAssignments();
+      });
+    }
+
+    function renderCreateExams() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 space-y-6">
+          <div>
+            <div class="text-2xl font-semibold text-slate-900">Create Exams</div>
+            <div class="text-slate-500">Draft assessment profiles for specific subjects.</div>
+          </div>
+          <form id="createExamForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Exam Title</span>
+              <input type="text" id="examTitle" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Monthly Math Test" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Subject</span>
+              <input type="text" id="examSubject" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Mathematics" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Class / Section</span>
+              <input type="text" id="examClass" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="5A" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Total Marks</span>
+              <input type="number" id="examTotal" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="100" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Create Exam</button>
+            </div>
+          </form>
+          <div id="examCreateResult" class="rounded-3xl border border-slate-200 bg-slate-50 p-6 hidden"></div>
+        </div>
+      `;
+      document.getElementById('createExamForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const title = document.getElementById('examTitle').value.trim();
+        const subject = document.getElementById('examSubject').value.trim();
+        const examClass = document.getElementById('examClass').value.trim();
+        const total = document.getElementById('examTotal').value.trim();
+        if (!title || !subject || !examClass || !total) return;
+        state.reports.push({ id: `EXM${Date.now()}`, title, subject, examClass, totalMarks: total });
+        const result = document.getElementById('examCreateResult');
+        result.classList.remove('hidden');
+        result.innerHTML = `
+          <div class="text-slate-700">Exam <strong>${title}</strong> for <strong>${subject}</strong> in class <strong>${examClass}</strong> has been created with <strong>${total} marks</strong>.</div>
+        `;
+        addNotification('[Teacher created exam] New exam created for ' + subject + '.', ['Vice Principal']);
+      });
+    }
+
+    function renderCommunicateWithParents() {
+      clearWorkspace();
+      const parentContacts = state.students.map(student => `
+        <option value="${student.admissionNumber}">${student.parent.name} (${student.name})</option>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 space-y-6">
+          <div>
+            <div class="text-2xl font-semibold text-slate-900">Communicate with Parents</div>
+            <div class="text-slate-500">Send targeted messages to individual parent profiles.</div>
+          </div>
+          <form id="parentMessageForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Select Child</span>
+              <select id="parentStudent" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">
+                ${parentContacts}
+              </select>
+            </label>
+            <label class="space-y-2 md:col-span-2">
+              <span class="text-sm font-medium text-slate-700">Message</span>
+              <textarea id="parentMessage" rows="5" class="w-full rounded-3xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Enter your message..." ></textarea>
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Send Message</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('parentMessageForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const studentId = document.getElementById('parentStudent').value;
+        const message = document.getElementById('parentMessage').value.trim();
+        if (!message) return;
+        const student = state.students.find(item => item.admissionNumber === studentId);
+        state.messages.push({ to: student.parent.name, message, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+        addNotification('[Teacher sent parent note] Message delivered to ' + student.parent.name + '.', ['Parent']);
+        alert('Message sent successfully to the parent.');
+      });
+    }
+
+    function renderTrackStudentProgress() {
+      clearWorkspace();
+      const student = state.students[0];
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Track Student Progress</div>
+            <div class="text-slate-500">Dynamic growth report card overview.</div>
+          </div>
+          <div class="grid gap-6 lg:grid-cols-3">
+            <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
+              <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Student</div>
+              <div class="mt-4 text-3xl font-semibold text-slate-900">${student.name}</div>
+              <div class="mt-2 text-slate-500">Grade ${student.grade}${student.section}</div>
+            </div>
+            <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
+              <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Attendance</div>
+              <div class="mt-4 text-3xl font-semibold text-slate-900">${student.attendance.present}/${student.attendance.present + student.attendance.absent + student.attendance.late}</div>
+              <div class="mt-2 text-slate-500">Present days out of total recorded school days.</div>
+            </div>
+            <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
+              <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Average Score</div>
+              <div class="mt-4 text-3xl font-semibold text-slate-900">${Math.round(Object.values(student.marks).reduce((sum, score) => sum + score, 0) / Object.values(student.marks).length)}%</div>
+              <div class="mt-2 text-slate-500">Current subject performance average.</div>
+            </div>
+          </div>
+          <div class="rounded-3xl bg-white p-6 shadow-sm border border-slate-200">
+            <div class="text-lg font-semibold text-slate-900 mb-4">Marks Breakdown</div>
+            <div class="space-y-3">
+              ${Object.entries(student.marks).map(([subject, score]) => `
+                <div class="rounded-2xl bg-slate-50 p-4">
+                  <div class="flex items-center justify-between text-slate-700"><span>${subject}</span><span class="font-semibold">${score}%</span></div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderViewStudentAttendance() {
+      clearWorkspace();
+      const student = state.students[0];
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">View Attendance</div>
+            <div class="text-slate-500">Personal attendance dashboard and trend summary.</div>
+          </div>
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="grid gap-6 md:grid-cols-3">
+              <div class="rounded-3xl bg-slate-50 p-6">
+                <div class="text-sm text-slate-500">Present</div>
+                <div class="mt-3 text-4xl font-semibold text-slate-900">${student.attendance.present}</div>
+              </div>
+              <div class="rounded-3xl bg-slate-50 p-6">
+                <div class="text-sm text-slate-500">Absent</div>
+                <div class="mt-3 text-4xl font-semibold text-slate-900">${student.attendance.absent}</div>
+              </div>
+              <div class="rounded-3xl bg-slate-50 p-6">
+                <div class="text-sm text-slate-500">Late</div>
+                <div class="mt-3 text-4xl font-semibold text-slate-900">${student.attendance.late}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderViewStudentMarks() {
+      clearWorkspace();
+      const student = state.students[0];
+      const rows = Object.entries(student.marks).map(([subject, mark]) => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${subject}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${mark}%</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">View Marks</div>
+          <div class="text-slate-500 mb-6">Compiled exam marks and feedback summary.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50 p-6">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-white text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Subject</th>
+                  <th class="px-4 py-3">Score</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderViewStudentTimetable() {
+      clearWorkspace();
+      const periods = [
+        { time: '08:30 - 09:15', subject: 'Mathematics' },
+        { time: '09:20 - 10:05', subject: 'Science' },
+        { time: '10:20 - 11:05', subject: 'English' },
+        { time: '11:10 - 11:55', subject: 'Social Studies' },
+        { time: '12:00 - 12:45', subject: 'Physical Education' }
+      ];
+      const rows = periods.map(period => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${period.time}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${period.subject}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">View Timetable</div>
+            <div class="text-slate-500">Daily class schedule for the active school day.</div>
+          </div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Time</th>
+                  <th class="px-4 py-3">Subject</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderDownloadMaterials() {
+      clearWorkspace();
+      const materials = [
+        { title: 'Chapter 6 Notes', type: 'PDF', size: '1.2MB' },
+        { title: 'History Worksheet', type: 'PDF', size: '870KB' },
+        { title: 'Science Lab Guide', type: 'PDF', size: '1.8MB' }
+      ];
+      const rows = materials.map(item => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${item.title}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${item.type}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${item.size}</td>
+          <td class="px-4 py-3 text-right"><button class="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition">Download</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Download Study Materials</div>
+          <div class="text-slate-500 mb-6">Resource center for lesson notes and PDF assets.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-white text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Title</th>
+                  <th class="px-4 py-3">Type</th>
+                  <th class="px-4 py-3">Size</th>
+                  <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSubmitAssignments() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 space-y-6">
+          <div>
+            <div class="text-2xl font-semibold text-slate-900">Submit Assignments</div>
+            <div class="text-slate-500">Upload assignment files with a validation checker.</div>
+          </div>
+          <div class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center drop-area">
+            <div class="text-slate-600">Drag and drop files here or click to select a file.</div>
+            <input id="studentAssignmentFile" type="file" class="mx-auto mt-6 block" />
+          </div>
+          <div class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Assignment Title</span>
+              <input type="text" id="studentAssignmentTitle" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Algebra Worksheet" />
+            </label>
+            <div class="flex items-end justify-end">
+              <button id="submitAssignmentButton" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Submit Assignment</button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('submitAssignmentButton').addEventListener('click', () => {
+        const title = document.getElementById('studentAssignmentTitle').value.trim();
+        const fileInput = document.getElementById('studentAssignmentFile');
+        if (!title || !fileInput.files.length) {
+          alert('Please enter an assignment title and select a file before submitting.');
+          return;
+        }
+        const file = fileInput.files[0];
+        if (file.size > 5 * 1024 * 1024) {
+          alert('File size must be under 5MB.');
+          return;
+        }
+        addNotification('[Student submitted assignment] Assignment delivered to teacher.', ['Teacher']);
+        alert(`Assignment "${title}" submitted successfully.`);
+      });
+    }
+
+    function renderPayStudentFees() {
+      clearWorkspace();
+      const dueFees = state.financials.fees.filter(item => item.status !== 'Paid');
+      const rows = dueFees.map(fee => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.student}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.type}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">₹${fee.amount.toLocaleString()}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.dueDate}</td>
+          <td class="px-4 py-3 text-right"><button onclick="payFee('${fee.id}')" class="rounded-2xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700">Pay Now</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Pay Fees</div>
+            <div class="text-slate-500">Review outstanding invoices and process payments.</div>
+          </div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-100 text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Student</th>
+                  <th class="px-4 py-3">Fee Type</th>
+                  <th class="px-4 py-3">Amount</th>
+                  <th class="px-4 py-3">Due Date</th>
+                  <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function payFee(feeId) {
+      const fee = state.financials.fees.find(item => item.id === feeId);
+      if (!fee) return;
+      fee.status = 'Paid';
+      addNotification('[Fee payment successful] Payment processed for ' + fee.student + '.', ['Accountant', 'Parent']);
+      renderPayStudentFees();
+    }
+
+    function renderViewStudentNotifications() {
+      clearWorkspace();
+      const studentNotifications = state.notifications.filter(item => item.channels.includes('Student') || item.channels.includes('Parent')).map(item => `
+        <div class="rounded-3xl bg-white p-4 shadow-sm border border-slate-200">
+          <div class="font-semibold text-slate-900">${item.message}</div>
+          <div class="mt-1 text-xs text-slate-500">${item.time}</div>
+        </div>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">View Notifications</div>
+          <div class="text-slate-500 mb-6">Live inbox alerts for recent school events.</div>
+          <div class="space-y-4">${studentNotifications || '<div class="rounded-3xl bg-slate-50 p-6 text-slate-500">No new notifications.</div>'}</div>
+        </div>
+      `;
+    }
+
+    function renderMonitorChildProgress() {
+      clearWorkspace();
+      const childOptions = state.students.map(student => `<option value="${student.admissionNumber}">${student.name}</option>`).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Monitor Child Progress</div>
+            <div class="text-slate-500">Toggle between multi-child accounts for learning records.</div>
+          </div>
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Select Child</span>
+              <select id="parentChildSelector" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">${childOptions}</select>
+            </label>
+            <div id="parentChildDetails" class="mt-6"></div>
+          </div>
+        </div>
+      `;
+      document.getElementById('parentChildSelector').addEventListener('change', (event) => renderParentChildDetails(event.target.value));
+      renderParentChildDetails(state.students[0].admissionNumber);
+    }
+
+    function renderParentChildDetails(admissionNumber) {
+      const student = state.students.find(item => item.admissionNumber === admissionNumber);
+      const container = document.getElementById('parentChildDetails');
+      if (!student) return;
+      container.innerHTML = `
+        <div class="grid gap-5 md:grid-cols-3">
+          <div class="rounded-3xl bg-slate-50 p-6">
+            <div class="text-sm text-slate-500">Attendance</div>
+            <div class="mt-3 text-3xl font-semibold text-slate-900">${student.attendance.present}/${student.attendance.present + student.attendance.absent + student.attendance.late}</div>
+          </div>
+          <div class="rounded-3xl bg-slate-50 p-6">
+            <div class="text-sm text-slate-500">Average Score</div>
+            <div class="mt-3 text-3xl font-semibold text-slate-900">${Math.round(Object.values(student.marks).reduce((sum, score) => sum + score, 0) / Object.values(student.marks).length)}%</div>
+          </div>
+          <div class="rounded-3xl bg-slate-50 p-6">
+            <div class="text-sm text-slate-500">Next Fee Due</div>
+            <div class="mt-3 text-3xl font-semibold text-slate-900">₹${(state.financials.fees.find(fee => fee.student === student.name && fee.status !== 'Paid')?.amount || 0).toLocaleString()}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderViewChildAttendance() {
+      clearWorkspace();
+      const rows = state.students.map(student => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${student.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${student.attendance.present}/${student.attendance.present + student.attendance.absent + student.attendance.late}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${Math.round((student.attendance.present / (student.attendance.present + student.attendance.absent + student.attendance.late)) * 100)}%</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">View Attendance</div>
+          <div class="text-slate-500 mb-6">Color-coded attendance tracking for child accounts.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-white text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Child</th>
+                  <th class="px-4 py-3">Attendance</th>
+                  <th class="px-4 py-3">Presence Rate</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderPayChildFees() {
+      clearWorkspace();
+      const childFees = state.financials.fees.map(fee => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.student}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.type}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">₹${fee.amount.toLocaleString()}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.status}</td>
+          <td class="px-4 py-3 text-right"><button onclick="payFee('${fee.id}')" class="rounded-2xl ${fee.status === 'Paid' ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'} px-4 py-2 text-xs font-semibold text-white">Pay</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Pay Child Fees</div>
+          <div class="text-slate-500 mb-6">Invoice terminal for tuition, transport, and boarding expenses.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-white text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Child</th>
+                  <th class="px-4 py-3">Fee Type</th>
+                  <th class="px-4 py-3">Amount</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>${childFees}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderChatWithTeachers() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200 space-y-6">
+          <div>
+            <div class="text-2xl font-semibold text-slate-900">Chat with Teachers</div>
+            <div class="text-slate-500">Interactive conversation module for parent-teacher communication.</div>
+          </div>
+          <div class="rounded-3xl border border-slate-200 bg-slate-50 p-6">
+            <div class="space-y-4 text-sm text-slate-700">
+              <div><span class="font-semibold">Priya Nair:</span> Please ensure your child completes the science worksheet.</div>
+              <div><span class="font-semibold">You:</span> Thank you, I will remind them.</div>
+            </div>
+          </div>
+          <form id="parentChatForm" class="grid gap-5">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Teacher</span>
+              <select id="chatTeacherSelect" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900">
+                ${state.teachers.map(teacher => `<option value="${teacher.employeeId}">${teacher.name}</option>`).join('')}
+              </select>
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Message</span>
+              <textarea id="parentChatMessage" rows="4" class="w-full rounded-3xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Write your message..."></textarea>
+            </label>
+            <div class="flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Send</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('parentChatForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const teacherId = document.getElementById('chatTeacherSelect').value;
+        const message = document.getElementById('parentChatMessage').value.trim();
+        if (!message) return;
+        const teacher = state.teachers.find(item => item.employeeId === teacherId);
+        addNotification('[Parent requested meeting] Message sent to ' + teacher.name + '.', ['Teacher']);
+        alert('Message sent to ' + teacher.name + '.');
+      });
+    }
+
+    function renderDownloadReportCards() {
+      clearWorkspace();
+      const cards = state.students.map(student => `
+        <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div class="font-semibold text-slate-900">${student.name}</div>
+          <div class="text-sm text-slate-500">Grade ${student.grade}${student.section}</div>
+          <button class="mt-4 rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition">Download Report Card</button>
+        </div>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-2xl font-semibold text-slate-900">Download Report Cards</div>
+            <div class="text-slate-500">Access digitally compiled school report card documents.</div>
+          </div>
+          <div class="grid gap-5 md:grid-cols-2">${cards}</div>
+        </div>
+      `;
+    }
+
+    function renderFeeCollection() {
+      clearWorkspace();
+      const rows = state.financials.fees.map(fee => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.student}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.type}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">₹${fee.amount.toLocaleString()}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${fee.dueDate}</td>
+          <td class="px-4 py-3 text-sm ${fee.status === 'Paid' ? 'text-emerald-600' : 'text-amber-600'}">${fee.status}</td>
+          <td class="px-4 py-3 text-right"><button onclick="payFee('${fee.id}')" class="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition">Process</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Fee Collection</div>
+          <div class="text-slate-500 mb-6">Track payments, process due fees, and generate receipts.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-white text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Student</th>
+                  <th class="px-4 py-3">Fee</th>
+                  <th class="px-4 py-3">Amount</th>
+                  <th class="px-4 py-3">Due Date</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSalaryManagement() {
+      clearWorkspace();
+      const rows = state.teachers.map(teacher => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${teacher.employeeId}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${teacher.name}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">₹${teacher.salary.toLocaleString()}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${teacher.leaveStatus === 'Approved' ? 'On Leave' : 'Active'}</td>
+          <td class="px-4 py-3 text-right"><button onclick="dispatchSalary('${teacher.employeeId}')" class="rounded-2xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white hover:bg-emerald-700 transition">Disburse</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Salary Management</div>
+          <div class="text-slate-500 mb-6">Staff payrolls, deductions, and salary dispatch distribution.</div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-white text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">Employee</th>
+                  <th class="px-4 py-3">Name</th>
+                  <th class="px-4 py-3">Salary</th>
+                  <th class="px-4 py-3">Status</th>
+                  <th class="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function dispatchSalary(employeeId) {
+      const teacher = state.teachers.find(item => item.employeeId === employeeId);
+      if (!teacher) return;
+      addNotification(`[Accountant dispatched salary] ${teacher.name}'s salary has been processed.`, ['Admin']);
+      alert(`Salary for ${teacher.name} has been dispatched.`);
+    }
+
+    function renderExpenseTracking() {
+      clearWorkspace();
+      const rows = state.financials.expenses.map(expense => `
+        <tr class="border-b border-slate-200 hover:bg-slate-50">
+          <td class="px-4 py-3 text-sm text-slate-700">${expense.id}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${expense.category}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${expense.description}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">₹${expense.amount.toLocaleString()}</td>
+          <td class="px-4 py-3 text-sm text-slate-700">${expense.date}</td>
+        </tr>
+      `).join('');
+      document.getElementById('workspace').innerHTML = `
+        <div class="space-y-6">
+          <div class="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div>
+              <div class="text-2xl font-semibold text-slate-900">Expense Tracking</div>
+              <div class="text-slate-500">Log utility expenses, vendor bills, and transaction items.</div>
+            </div>
+            <button onclick="renderAddExpenseForm()" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Add Expense</button>
+          </div>
+          <div class="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-sm">
+            <table class="min-w-full text-left text-sm text-slate-600">
+              <thead class="bg-white text-slate-700">
+                <tr>
+                  <th class="px-4 py-3">ID</th>
+                  <th class="px-4 py-3">Category</th>
+                  <th class="px-4 py-3">Description</th>
+                  <th class="px-4 py-3">Amount</th>
+                  <th class="px-4 py-3">Date</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderAddExpenseForm() {
+      clearWorkspace();
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-2">Add Expense</div>
+          <div class="text-slate-500 mb-6">Log a new expense item for vendor or utility payment.</div>
+          <form id="expenseForm" class="grid gap-5 md:grid-cols-2">
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Category</span>
+              <input type="text" id="expenseCategory" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Utilities" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Description</span>
+              <input type="text" id="expenseDescription" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="Electricity bill" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Amount</span>
+              <input type="number" id="expenseAmount" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" placeholder="22000" />
+            </label>
+            <label class="space-y-2">
+              <span class="text-sm font-medium text-slate-700">Payment Date</span>
+              <input type="date" id="expenseDate" class="w-full rounded-2xl border border-slate-300 px-4 py-3 focus:border-slate-900" />
+            </label>
+            <div class="md:col-span-2 flex justify-end">
+              <button type="submit" class="rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Save Expense</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.getElementById('expenseForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        state.financials.expenses.push({ id: `EXP${Date.now()}`, category: document.getElementById('expenseCategory').value.trim(), description: document.getElementById('expenseDescription').value.trim(), amount: Number(document.getElementById('expenseAmount').value.trim()), date: document.getElementById('expenseDate').value });
+        addNotification('[Accountant logged expense] New expense recorded.', ['Admin']);
+        alert('Expense recorded successfully.');
+        renderExpenseTracking();
+      });
+    }
+
+    function renderFinancialReports() {
+      clearWorkspace();
+      const revenue = state.financials.fees.reduce((sum, fee) => sum + fee.amount, 0);
+      const expense = state.financials.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+      const profit = revenue - expense;
+      document.getElementById('workspace').innerHTML = `
+        <div class="grid gap-6 md:grid-cols-3">
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Total Revenue</div>
+            <div class="mt-4 text-4xl font-semibold text-slate-900">₹${revenue.toLocaleString()}</div>
+          </div>
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Total Expenses</div>
+            <div class="mt-4 text-4xl font-semibold text-slate-900">₹${expense.toLocaleString()}</div>
+          </div>
+          <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+            <div class="text-sm uppercase tracking-[0.2em] text-slate-500">Net Balance</div>
+            <div class="mt-4 text-4xl font-semibold ${profit >= 0 ? 'text-emerald-700' : 'text-rose-600'}">₹${profit.toLocaleString()}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderTaxReports() {
+      clearWorkspace();
+      const totalExpenses = state.financials.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+      const taxLiability = Math.round(totalExpenses * 0.18);
+      document.getElementById('workspace').innerHTML = `
+        <div class="rounded-3xl bg-white p-8 shadow-sm border border-slate-200">
+          <div class="text-2xl font-semibold text-slate-900 mb-3">Tax Reports</div>
+          <div class="text-slate-500 mb-6">Export structured auditing sheets for accounting and tax compliance.</div>
+          <div class="grid gap-6 md:grid-cols-2">
+            <div class="rounded-3xl bg-slate-50 p-6">
+              <div class="text-sm text-slate-500">Expense Total</div>
+              <div class="mt-3 text-3xl font-semibold text-slate-900">₹${totalExpenses.toLocaleString()}</div>
+            </div>
+            <div class="rounded-3xl bg-slate-50 p-6">
+              <div class="text-sm text-slate-500">Estimated Tax Liability</div>
+              <div class="mt-3 text-3xl font-semibold text-slate-900">₹${taxLiability.toLocaleString()}</div>
+            </div>
+          </div>
+          <div class="mt-6 rounded-3xl bg-white p-6 border border-slate-200">
+            <button onclick="alert('Tax report exported successfully.')" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 transition">Export Report</button>
+          </div>
+        </div>
+      `;
+    }
+
+    init();
+  </script>
+</body>
+</html>
