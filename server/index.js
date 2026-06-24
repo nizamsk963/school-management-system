@@ -9,6 +9,7 @@ import { teacherRouter } from './routes/teachers.js';
 import { admissionRouter } from './routes/admissions.js';
 import { authRouter } from './routes/auth.js';
 import { paymentsRouter } from './routes/payments.js';
+import { staffRouter } from './routes/staff.js';
 import { User } from './models/User.js';
 
 dotenv.config();
@@ -24,6 +25,7 @@ app.use('/api/students', studentRouter);
 app.use('/api/teachers', teacherRouter);
 app.use('/api/admissions', admissionRouter);
 app.use('/api/payments', paymentsRouter);
+app.use('/api/staff', staffRouter);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

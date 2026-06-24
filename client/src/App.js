@@ -606,6 +606,265 @@ function StudentRecordsPanel({ state }) {
   );
 }
 
+function FeeCollectionPanel({ state, setState }) {
+  const [feeFormData, setFeeFormData] = useState({ student: '', amount: '', type: 'Tuition', paymentMethod: 'Card', notes: '' });
+  const paymentMethods = [
+    { value: 'Card', label: '💳 Credit/Debit Card' },
+    { value: 'Cash', label: '💵 Cash Payment' },
+    { value: 'Bank Transfer', label: '🏦 Bank Transfer' },
+    { value: 'Cheque', label: '📋 Cheque' },
+    { value: 'Net Banking', label: '🌐 Net Banking' },
+    { value: 'UPI', label: '📱 UPI/Digital Wallet' }
+  ];
+  const handleFeeChange = (e) => { const { name, value } = e.target; setFeeFormData(prev => ({ ...prev, [name]: value })); };
+  const handleFeeSubmit = (e) => {
+    e.preventDefault();
+    const newFee = { id: `FEE${Date.now()}`, student: feeFormData.student, amount: parseFloat(feeFormData.amount), type: feeFormData.type, paymentMethod: feeFormData.paymentMethod, notes: feeFormData.notes, status: 'Paid', date: new Date().toLocaleDateString() };
+    setState(prev => ({ ...prev, financials: { ...prev.financials, fees: [...prev.financials.fees, newFee] } }));
+    setFeeFormData({ student: '', amount: '', type: 'Tuition', paymentMethod: 'Card', notes: '' });
+    alert('Payment recorded successfully via ' + feeFormData.paymentMethod);
+  };
+  const paid = state.financials.fees.filter(f => f.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
+  const pending = state.financials.fees.filter(f => f.status !== 'Paid').reduce((sum, item) => sum + item.amount, 0);
+  const byMethod = state.financials.fees.reduce((acc, f) => { acc[f.paymentMethod] = (acc[f.paymentMethod] || 0) + f.amount; return acc; }, {});
+
+  return (
+    <DashboardPanel title="Fee Collection" subtitle="Record and manage student fee payments with multiple payment methods.">
+      <div className="metrics-grid">
+        <div className="metric-card"><div>Total Collected</div><div>₹{paid.toLocaleString()}</div></div>
+        <div className="metric-card"><div>Pending</div><div>₹{pending.toLocaleString()}</div></div>
+        <div className="metric-card"><div>Total Fees</div><div>{state.financials.fees.length}</div></div>
+        <div className="metric-card"><div>Collection Rate</div><div>{state.financials.fees.length > 0 ? Math.round((paid / (paid + pending)) * 100) : 0}%</div></div>
+      </div>
+      <form className="grid-form" onSubmit={handleFeeSubmit} style={{ marginTop: '1.5rem', borderTop: '1px solid #ddd', paddingTop: '1rem' }}>
+        <h3>📝 Record New Payment</h3>
+        <label>Student Name<input name="student" value={feeFormData.student} onChange={handleFeeChange} required placeholder="Enter student name" /></label>
+        <label>Amount<input name="amount" type="number" value={feeFormData.amount} onChange={handleFeeChange} required placeholder="₹ Amount" step="0.01" min="0" /></label>
+        <label>Fee Type<select name="type" value={feeFormData.type} onChange={handleFeeChange}><option value="Tuition">Tuition Fee</option><option value="Transport">Transport</option><option value="Hostel">Hostel</option><option value="Exam">Exam</option><option value="Activity">Activity</option><option value="Other">Other</option></select></label>
+        <label>Payment Method<select name="paymentMethod" value={feeFormData.paymentMethod} onChange={handleFeeChange}>{paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label>
+        <label>Ref/Cheque No.<input name="notes" value={feeFormData.notes} onChange={handleFeeChange} placeholder="Transaction ID / Cheque number" /></label>
+        <div className="form-actions"><button type="submit">Record Payment</button></div>
+      </form>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>💰 Payment Method Breakdown</h3>
+        <div className="table-card">
+          <table>
+            <thead><tr><th>Payment Method</th><th>Amount</th><th>% of Total</th></tr></thead>
+            <tbody>
+              {Object.entries(byMethod).map(([method, amount]) => (
+                <tr key={method}><td>{paymentMethods.find(m => m.value === method)?.label || method}</td><td>₹{amount.toLocaleString()}</td><td>{Math.round((amount / paid) * 100) || 0}%</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>📊 Recent Payments</h3>
+        <div className="table-card">
+          <table>
+            <thead><tr><th>Date</th><th>Student</th><th>Amount</th><th>Type</th><th>Method</th></tr></thead>
+            <tbody>
+              {state.financials.fees.slice(-8).reverse().map((f) => (
+                <tr key={f.id}><td>{f.date}</td><td>{f.student}</td><td>₹{f.amount.toLocaleString()}</td><td>{f.type}</td><td>{f.paymentMethod}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </DashboardPanel>
+  );
+}
+
+function SalaryManagementPanel({ state, setState }) {
+  const [salaryForm, setSalaryForm] = useState({ employee: '', designation: '', amount: '', month: new Date().toISOString().slice(0, 7) });
+  const [salaries, setSalaries] = useState(state.teachers.map(t => ({ ...t, paid: false })));
+  const handleSalaryChange = (e) => { const { name, value } = e.target; setSalaryForm(prev => ({ ...prev, [name]: value })); };
+  const handleSalarySubmit = (e) => {
+    e.preventDefault();
+    setSalaries(prev => [...prev, { id: `SAL${Date.now()}`, ...salaryForm, paid: true, status: 'Paid' }]);
+    setSalaryForm({ employee: '', designation: '', amount: '', month: new Date().toISOString().slice(0, 7) });
+    alert(`Salary recorded: ${salaryForm.employee} - ₹${salaryForm.amount}`);
+  };
+  const totalSalaries = salaries.filter(s => s.paid).reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
+  const pendingSalaries = salaries.filter(s => !s.paid).reduce((sum, s) => sum + parseFloat(s.amount || 0), 0);
+
+  return (
+    <DashboardPanel title="Salary Management" subtitle="Manage employee salaries, payments, and compensation records.">
+      <div className="metrics-grid">
+        <div className="metric-card"><div>Total Paid</div><div>₹{totalSalaries.toLocaleString()}</div></div>
+        <div className="metric-card"><div>Pending</div><div>₹{pendingSalaries.toLocaleString()}</div></div>
+        <div className="metric-card"><div>Employees</div><div>{state.teachers.length + (state.staff || []).length}</div></div>
+        <div className="metric-card"><div>Avg Salary</div><div>₹{state.teachers.length > 0 ? Math.round(state.teachers.reduce((s, t) => s + (t.salary || 0), 0) / state.teachers.length).toLocaleString() : 0}</div></div>
+      </div>
+      <form className="grid-form" onSubmit={handleSalarySubmit} style={{ marginTop: '1.5rem', borderTop: '1px solid #ddd', paddingTop: '1rem' }}>
+        <h3>💼 Process Salary Payment</h3>
+        <label>Employee Name<input name="employee" value={salaryForm.employee} onChange={handleSalaryChange} required placeholder="Enter employee name" /></label>
+        <label>Designation<input name="designation" value={salaryForm.designation} onChange={handleSalaryChange} placeholder="Teacher, Staff, etc." /></label>
+        <label>Salary Amount<input name="amount" type="number" value={salaryForm.amount} onChange={handleSalaryChange} required placeholder="₹ Amount" step="0.01" min="0" /></label>
+        <label>Month<input name="month" type="month" value={salaryForm.month} onChange={handleSalaryChange} required /></label>
+        <div className="form-actions"><button type="submit">Record Salary Payment</button></div>
+      </form>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>👥 Staff Salary Records</h3>
+        <div className="table-card">
+          <table>
+            <thead><tr><th>Employee</th><th>Designation</th><th>Amount</th><th>Month</th><th>Status</th></tr></thead>
+            <tbody>
+              {salaries.slice(-10).reverse().map((s) => (
+                <tr key={s.id}><td>{s.employee || s.name}</td><td>{s.designation || 'N/A'}</td><td>₹{(s.amount || s.salary || 0).toLocaleString()}</td><td>{s.month}</td><td><span style={{background: s.paid ? '#d4edda' : '#fff3cd', padding: '2px 8px', borderRadius: '4px'}}>{s.paid ? '✓ Paid' : '⏳ Pending'}</span></td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </DashboardPanel>
+  );
+}
+
+function ExpenseTrackingPanel({ state, setState }) {
+  const [expenseForm, setExpenseForm] = useState({ category: 'Maintenance', description: '', amount: '', date: new Date().toISOString().slice(0, 10) });
+  const handleExpenseChange = (e) => { const { name, value } = e.target; setExpenseForm(prev => ({ ...prev, [name]: value })); };
+  const handleExpenseSubmit = (e) => {
+    e.preventDefault();
+    setState(prev => ({ ...prev, financials: { ...prev.financials, expenses: [...prev.financials.expenses, { id: `EXP${Date.now()}`, ...expenseForm, amount: parseFloat(expenseForm.amount) }] } }));
+    setExpenseForm({ category: 'Maintenance', description: '', amount: '', date: new Date().toISOString().slice(0, 10) });
+    alert(`Expense recorded: ${expenseForm.category} - ₹${expenseForm.amount}`);
+  };
+  const expensesByCategory = state.financials.expenses.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + e.amount; return acc; }, {});
+  const totalExpenses = state.financials.expenses.reduce((sum, e) => sum + e.amount, 0);
+
+  return (
+    <DashboardPanel title="Expense Tracking" subtitle="Track and categorize school operational expenses.">
+      <div className="metrics-grid">
+        <div className="metric-card"><div>Total Expenses</div><div>₹{totalExpenses.toLocaleString()}</div></div>
+        <div className="metric-card"><div>Expense Count</div><div>{state.financials.expenses.length}</div></div>
+        <div className="metric-card"><div>Avg per Expense</div><div>₹{state.financials.expenses.length > 0 ? Math.round(totalExpenses / state.financials.expenses.length).toLocaleString() : 0}</div></div>
+        <div className="metric-card"><div>Top Category</div><div>{Object.keys(expensesByCategory)[0] || 'N/A'}</div></div>
+      </div>
+      <form className="grid-form" onSubmit={handleExpenseSubmit} style={{ marginTop: '1.5rem', borderTop: '1px solid #ddd', paddingTop: '1rem' }}>
+        <h3>➕ Add New Expense</h3>
+        <label>Category<select name="category" value={expenseForm.category} onChange={handleExpenseChange}><option value="Utilities">Utilities (Electric, Water)</option><option value="Maintenance">Maintenance & Repairs</option><option value="Supplies">Office Supplies</option><option value="Transport">Transport</option><option value="Staff">Staff Benefits</option><option value="Other">Other</option></select></label>
+        <label>Description<input name="description" value={expenseForm.description} onChange={handleExpenseChange} required placeholder="What was purchased or paid for?" /></label>
+        <label>Amount<input name="amount" type="number" value={expenseForm.amount} onChange={handleExpenseChange} required placeholder="₹ Amount" step="0.01" min="0" /></label>
+        <label>Date<input name="date" type="date" value={expenseForm.date} onChange={handleExpenseChange} required /></label>
+        <div className="form-actions"><button type="submit">Record Expense</button></div>
+      </form>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>📈 Expenses by Category</h3>
+        <div className="grid-cards">
+          {Object.entries(expensesByCategory).map(([cat, amount]) => (
+            <div className="stat-card" key={cat} style={{ background: '#f8f9fa' }}>
+              <div>{cat}</div>
+              <div>₹{amount.toLocaleString()}</div>
+              <div style={{ fontSize: '0.85em', color: '#666' }}>{Math.round((amount / totalExpenses) * 100)}% of total</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>📝 Recent Expenses</h3>
+        <div className="table-card">
+          <table>
+            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
+            <tbody>
+              {state.financials.expenses.slice(-10).reverse().map((e) => (
+                <tr key={e.id}><td>{e.date}</td><td>{e.category}</td><td>{e.description}</td><td>₹{e.amount.toLocaleString()}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </DashboardPanel>
+  );
+}
+
+function FinancialReportsPanel({ state }) {
+  const revenue = state.financials.fees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const expenses = state.financials.expenses.reduce((sum, e) => sum + e.amount, 0);
+  const profit = revenue - expenses;
+  const pendingFees = state.financials.fees.filter(f => f.status !== 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const feesByType = state.financials.fees.reduce((acc, f) => { acc[f.type] = (acc[f.type] || 0) + f.amount; return acc; }, {});
+
+  return (
+    <DashboardPanel title="Financial Reports" subtitle="Comprehensive financial analysis and performance metrics.">
+      <div className="metrics-grid">
+        <div className="metric-card" style={{ borderLeft: '4px solid #28a745' }}><div>Revenue (Collected)</div><div>₹{revenue.toLocaleString()}</div><div style={{ fontSize: '0.8em', color: '#666' }}>From {state.financials.fees.filter(f => f.status === 'Paid').length} payments</div></div>
+        <div className="metric-card" style={{ borderLeft: '4px solid #dc3545' }}><div>Total Expenses</div><div>₹{expenses.toLocaleString()}</div><div style={{ fontSize: '0.8em', color: '#666' }}>Across {state.financials.expenses.length} items</div></div>
+        <div className="metric-card" style={{ borderLeft: '4px solid #0069d6' }}><div>Net Profit</div><div>₹{profit.toLocaleString()}</div><div style={{ fontSize: '0.8em', color: profit > 0 ? '#28a745' : '#dc3545' }}>{profit > 0 ? '✓ Positive' : '✗ Negative'}</div></div>
+        <div className="metric-card" style={{ borderLeft: '4px solid #ffc107' }}><div>Pending Revenue</div><div>₹{pendingFees.toLocaleString()}</div><div style={{ fontSize: '0.8em', color: '#666' }}>Awaiting collection</div></div>
+      </div>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>💹 Financial Summary</h3>
+        <div className="grid-cards">
+          <div className="stat-card" style={{ background: '#e8f5e9' }}><div>Profit Margin</div><div>{revenue > 0 ? Math.round((profit / revenue) * 100) : 0}%</div></div>
+          <div className="stat-card" style={{ background: '#e3f2fd' }}><div>Expense Ratio</div><div>{revenue > 0 ? Math.round((expenses / revenue) * 100) : 0}%</div></div>
+          <div className="stat-card" style={{ background: '#fff3e0' }}><div>Collection Rate</div><div>{revenue + pendingFees > 0 ? Math.round((revenue / (revenue + pendingFees)) * 100) : 0}%</div></div>
+        </div>
+      </div>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>📊 Revenue by Fee Type</h3>
+        <div className="table-card">
+          <table>
+            <thead><tr><th>Fee Type</th><th>Amount</th><th>% of Revenue</th></tr></thead>
+            <tbody>
+              {Object.entries(feesByType).map(([type, amount]) => (
+                <tr key={type}><td>{type}</td><td>₹{amount.toLocaleString()}</td><td>{Math.round((amount / revenue) * 100) || 0}%</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </DashboardPanel>
+  );
+}
+
+function TaxReportsPanel({ state }) {
+  const revenue = state.financials.fees.filter(f => f.status === 'Paid').reduce((sum, f) => sum + f.amount, 0);
+  const expenses = state.financials.expenses.reduce((sum, e) => sum + e.amount, 0);
+  const grossProfit = revenue - expenses;
+  const gstRate = 0.18;
+  const gstAmount = revenue * gstRate;
+  const taxableIncome = grossProfit;
+  const incomeTaxRate = taxableIncome > 250000 ? 0.30 : 0.20;
+  const incomeTax = Math.max(0, taxableIncome * incomeTaxRate);
+  const tdsDeducted = revenue * 0.02;
+
+  return (
+    <DashboardPanel title="Tax Reports" subtitle="Tax compliance and deduction calculations for school.">
+      <div className="metrics-grid">
+        <div className="metric-card" style={{ borderLeft: '4px solid #6610f2' }}><div>Taxable Income</div><div>₹{taxableIncome.toLocaleString()}</div></div>
+        <div className="metric-card" style={{ borderLeft: '4px solid #e83e8c' }}><div>Estimated Income Tax</div><div>₹{incomeTax.toLocaleString()}</div><div style={{ fontSize: '0.8em', color: '#666' }}>{Math.round(incomeTaxRate * 100)}% slab</div></div>
+        <div className="metric-card" style={{ borderLeft: '4px solid #fd7e14' }}><div>GST Liability</div><div>₹{gstAmount.toLocaleString()}</div><div style={{ fontSize: '0.8em', color: '#666' }}>18% on revenue</div></div>
+        <div className="metric-card" style={{ borderLeft: '4px solid #20c997' }}><div>TDS Deducted</div><div>₹{tdsDeducted.toLocaleString()}</div><div style={{ fontSize: '0.8em', color: '#666' }}>2% withheld</div></div>
+      </div>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd' }}>
+        <h3>📋 Tax Breakdown</h3>
+        <div className="table-card">
+          <table>
+            <thead><tr><th>Tax Component</th><th>Amount</th><th>Rate/Basis</th></tr></thead>
+            <tbody>
+              <tr><td>Gross Revenue</td><td>₹{revenue.toLocaleString()}</td><td>100%</td></tr>
+              <tr><td>Total Expenses</td><td>₹{expenses.toLocaleString()}</td><td>{Math.round((expenses / revenue) * 100)}%</td></tr>
+              <tr style={{ borderTop: '2px solid #ddd', fontWeight: 'bold' }}><td>Gross Profit</td><td>₹{grossProfit.toLocaleString()}</td><td>-</td></tr>
+              <tr><td>Income Tax @ {Math.round(incomeTaxRate * 100)}%</td><td>₹{incomeTax.toLocaleString()}</td><td>On gross profit</td></tr>
+              <tr><td>GST @ 18%</td><td>₹{gstAmount.toLocaleString()}</td><td>On revenue</td></tr>
+              <tr><td>TDS @ 2%</td><td>₹{tdsDeducted.toLocaleString()}</td><td>Tax withheld</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #ddd', background: '#f8f9fa', padding: '1rem', borderRadius: '4px' }}>
+        <h3>⚠️ Tax Summary</h3>
+        <div style={{ fontSize: '0.95em', lineHeight: '1.8' }}>
+          <div><strong>Total Tax Obligation:</strong> ₹{(incomeTax + gstAmount - tdsDeducted).toLocaleString()}</div>
+          <div><strong>Net Tax Due:</strong> ₹{Math.max(0, incomeTax + gstAmount - tdsDeducted).toLocaleString()}</div>
+          <div style={{ marginTop: '0.5rem', color: '#666', fontSize: '0.9em' }}>Note: This is a simplified tax estimate. Consult with a tax professional for actual compliance.</div>
+        </div>
+      </div>
+    </DashboardPanel>
+  );
+}
+
 function RevenueReportsPanel({ state }) {
   const paid = state.financials.fees.filter(f => f.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
   const pending = state.financials.fees.filter(f => f.status !== 'Paid').reduce((sum, item) => sum + item.amount, 0);
@@ -1644,7 +1903,45 @@ function DashboardActionPanel({ action, state, setState, currentRole }) {
   } else if (lowerAction.includes('create') && lowerAction.includes('parent')) {
     content = renderEntityForm('parents', 'Parent', ['contact', 'child']);
   } else if (lowerAction.includes('create') && lowerAction.includes('staff')) {
-    content = renderEntityForm('staff', 'Staff', ['department', 'status']);
+    const [staffFormData, setStaffFormData] = useState({ name: '', email: '', loginId: '', password: '', department: '', status: 'Active' });
+    const handleStaffChange = (e) => { const { name, value } = e.target; setStaffFormData(prev => ({ ...prev, [name]: value })); };
+    const handleStaffSubmit = async (e) => {
+      e.preventDefault();
+      try {
+        const payload = { email: staffFormData.email, password: staffFormData.password, role: 'Staff', loginId: staffFormData.loginId };
+        await axios.post('/api/auth/register', payload);
+        const newStaff = { employeeId: `STF${Date.now()}`, name: staffFormData.name, email: staffFormData.email, loginId: staffFormData.loginId, department: staffFormData.department, status: staffFormData.status };
+        setState(prev => ({ ...prev, staff: [...(prev.staff || []), newStaff] }));
+        setStaffFormData({ name: '', email: '', loginId: '', password: '', department: '', status: 'Active' });
+        alert('Staff member created successfully with login credentials.');
+      } catch (err) {
+        const message = err?.response?.data?.error || err.message || 'Failed to create staff member';
+        alert('Error creating staff member: ' + message);
+      }
+    };
+    content = (
+      <>
+        <form className="grid-form" onSubmit={handleStaffSubmit}>
+          <label>Staff Name<input name="name" value={staffFormData.name} onChange={handleStaffChange} required placeholder="Enter staff name" /></label>
+          <label>Email<input name="email" value={staffFormData.email} onChange={handleStaffChange} required placeholder="staff@school.edu" /></label>
+          <label>Login ID<input name="loginId" value={staffFormData.loginId} onChange={handleStaffChange} required placeholder="STF-001" /></label>
+          <label>Password<input name="password" type="password" value={staffFormData.password} onChange={handleStaffChange} required placeholder="Create a secure password" /></label>
+          <label>Department<input name="department" value={staffFormData.department} onChange={handleStaffChange} placeholder="e.g., Transport, Maintenance, Security" /></label>
+          <label>Status<select name="status" value={staffFormData.status} onChange={handleStaffChange}><option value="Active">Active</option><option value="Inactive">Inactive</option><option value="On Leave">On Leave</option></select></label>
+          <div className="form-actions"><button type="submit">Create Staff Member</button></div>
+        </form>
+        <div className="table-card" style={{ marginTop: '1.25rem' }}>
+          <table>
+            <thead><tr><th>Staff Name</th><th>Login ID</th><th>Email</th><th>Department</th><th>Status</th></tr></thead>
+            <tbody>
+              {(state.staff || []).map((item, idx) => (
+                <tr key={`staff-${idx}`}><td>{item.name}</td><td>{item.loginId || item.employeeId}</td><td>{item.email || 'n/a'}</td><td>{item.department || 'N/A'}</td><td>{item.status || 'Active'}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
   } else if (lowerAction.includes('create') && lowerAction.includes('admin')) {
     content = renderEntityForm('admins', 'Admin');
   } else if (lowerAction.includes('create') && lowerAction.includes('accountant')) {
@@ -1688,13 +1985,42 @@ function DashboardActionPanel({ action, state, setState, currentRole }) {
   } else if (lowerAction.includes('fee') || lowerAction.includes('salary') || lowerAction.includes('expense') || lowerAction.includes('financial') || lowerAction.includes('tax') || lowerAction.includes('pay')) {
     const collected = state.financials.fees.filter(f => f.status === 'Paid').reduce((sum, item) => sum + item.amount, 0);
     const pending = state.financials.fees.filter(f => f.status !== 'Paid').reduce((sum, item) => sum + item.amount, 0);
+    const [feeFormData, setFeeFormData] = useState({ student: '', amount: '', type: 'Tuition', paymentMethod: 'Card', notes: '' });
+    const paymentMethods = [
+      { value: 'Card', label: 'Credit/Debit Card' },
+      { value: 'Cash', label: 'Cash Payment' },
+      { value: 'Bank Transfer', label: 'Bank Transfer' },
+      { value: 'Cheque', label: 'Cheque' },
+      { value: 'Net Banking', label: 'Net Banking' },
+      { value: 'UPI', label: 'UPI/Digital Wallet' }
+    ];
+    const handleFeeChange = (e) => { const { name, value } = e.target; setFeeFormData(prev => ({ ...prev, [name]: value })); };
+    const handleFeeSubmit = (e) => {
+      e.preventDefault();
+      const newFee = { id: `FEE${Date.now()}`, student: feeFormData.student, amount: parseFloat(feeFormData.amount), type: feeFormData.type, paymentMethod: feeFormData.paymentMethod, notes: feeFormData.notes, status: 'Paid', date: new Date().toLocaleDateString() };
+      setState(prev => ({ ...prev, financials: { ...prev.financials, fees: [...prev.financials.fees, newFee] } }));
+      setFeeFormData({ student: '', amount: '', type: 'Tuition', paymentMethod: 'Card', notes: '' });
+      alert('Payment recorded successfully via ' + feeFormData.paymentMethod);
+    };
     content = (
       <>
         <div className="metrics-grid">
           <div className="metric-card"><div>Collected</div><div>₹{collected.toLocaleString()}</div></div>
           <div className="metric-card"><div>Pending</div><div>₹{pending.toLocaleString()}</div></div>
         </div>
-        {renderSummaryTable(state.financials.fees, ['id', 'student', 'type', 'amount', 'status'])}
+        <form className="grid-form" onSubmit={handleFeeSubmit} style={{ marginTop: '1.5rem' }}>
+          <h3>Record Payment</h3>
+          <label>Student Name<input name="student" value={feeFormData.student} onChange={handleFeeChange} required placeholder="Enter student name" /></label>
+          <label>Amount<input name="amount" type="number" value={feeFormData.amount} onChange={handleFeeChange} required placeholder="Enter amount in ₹" step="0.01" /></label>
+          <label>Fee Type<select name="type" value={feeFormData.type} onChange={handleFeeChange}><option value="Tuition">Tuition Fee</option><option value="Transport">Transport Fee</option><option value="Hostel">Hostel Fee</option><option value="Exam">Exam Fee</option><option value="Activity">Activity Fee</option><option value="Other">Other</option></select></label>
+          <label>Payment Method<select name="paymentMethod" value={feeFormData.paymentMethod} onChange={handleFeeChange}>{paymentMethods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}</select></label>
+          <label>Transaction/Reference No.<input name="notes" value={feeFormData.notes} onChange={handleFeeChange} placeholder="Enter transaction ID, cheque no., or reference" /></label>
+          <div className="form-actions"><button type="submit">Record Payment</button></div>
+        </form>
+        <div style={{ marginTop: '1.5rem' }}>
+          <h3>Recent Payments</h3>
+          {renderSummaryTable(state.financials.fees.slice(-10).reverse(), ['date', 'student', 'type', 'amount', 'paymentMethod', 'status'])}
+        </div>
       </>
     );
   } else if (lowerAction.includes('communicat') || lowerAction.includes('chat') || lowerAction.includes('staffcommunications') || lowerAction.includes('discipline')) {
@@ -1792,6 +2118,16 @@ function renderDashboardContent(action, state, setState, currentRole, user) {
       return <DashboardPanel title="Total Teachers" subtitle="View total teaching staff."><div className="metrics-grid"><div className="metric-card"><div>Teachers</div><div>{state.teachers.length}</div></div></div></DashboardPanel>;
     case 'renderViewRevenueReports':
       return <RevenueReportsPanel state={state} />;
+    case 'renderFeeCollection':
+      return <FeeCollectionPanel state={state} setState={setState} />;
+    case 'renderSalaryManagement':
+      return <SalaryManagementPanel state={state} setState={setState} />;
+    case 'renderExpenseTracking':
+      return <ExpenseTrackingPanel state={state} setState={setState} />;
+    case 'renderFinancialReports':
+      return <FinancialReportsPanel state={state} />;
+    case 'renderTaxReports':
+      return <TaxReportsPanel state={state} />;
     case 'renderApproveLeaveRequests':
       return <LeaveRequestsPanel state={state} setState={setState} />;
     case 'renderReviewAcademicReports':
